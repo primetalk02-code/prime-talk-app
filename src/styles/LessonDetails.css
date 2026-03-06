@@ -1,0 +1,84 @@
+.lesson-details-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 28px 18px;
+}
+
+.lesson-details-container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.lesson-details-back-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  transition: all 0.2s ease;
+}
+
+.lesson-details-back-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateX(-2px);
+}
+
+.lesson-details-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 16px 40px rgba(18, 38, 63, 0.18);
+}
+
+.lesson-details-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #eef2ff;
+  color: #3f51b5;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  margin-bottom: 14px;
+}
+
+.lesson-details-title {
+  margin: 0 0 18px;
+  font-size: 2.1rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #111827;
+  font-weight: 800;
+}
+
+.lesson-details-content p {
+  margin: 0 0 14px;
+  color: #374151;
+  line-height: 1.85;
+  font-size: 1rem;
+}
+
+.lesson-details-content p:last-child {
+  margin-bottom: 0;
+}
+
+.lesson-details-status {
+  margin: 0;
+  color: #4b5563;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .lesson-details-card {
+    padding: 24px 20px;
+  }
+
+  .lesson-details-title {
+    font-size: 1.7rem;
+  }
+}
