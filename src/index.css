@@ -7,12 +7,24 @@
 @layer base {
   :root {
     --app-bg: #f4f7fb;
-    --app-surface: #ffffff;
+    --app-surface: #ffffffcc;
     --app-border: #dbe6f5;
     --app-text: #0f172a;
     --app-muted: #5b6475;
     --brand-1: #0ea5e9;
     --brand-2: #22d3ee;
+    --glass-blur: 18px;
+  }
+
+  .dark {
+    --app-bg: #0f172a;
+    --app-surface: #1e293bcc;
+    --app-border: #334155;
+    --app-text: #f1f5f9;
+    --app-muted: #94a3b8;
+    --brand-1: #0ea5e9;
+    --brand-2: #22d3ee;
+    --glass-blur: 18px;
   }
 
   html,
@@ -27,6 +39,7 @@
       radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.14), transparent 35%),
       radial-gradient(circle at 100% 20%, rgba(34, 211, 238, 0.12), transparent 32%);
     background-attachment: fixed;
+    transition: background 0.4s;
   }
 
   * {
@@ -39,5 +52,16 @@
   h4,
   h5 {
     @apply font-display;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: 1.25rem;
+    border: 1px solid var(--app-border);
   }
 }

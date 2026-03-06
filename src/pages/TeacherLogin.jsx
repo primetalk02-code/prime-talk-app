@@ -21,60 +21,45 @@ function TeacherLogin() {
       if (!email.trim()) {
         throw new Error('Email is required')
       }
-
       if (!password) {
         throw new Error('Password is required')
       }
-
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
-
       if (signInError) {
         throw signInError
       }
-
       if (!data?.user) {
         throw new Error('Unable to get user after login')
       }
-
-      const fallbackName =
-        data.user.user_metadata?.full_name ||
-        data.user.user_metadata?.name ||
-        data.user.email?.split('@')?.[0] ||
-        data.user.email ||
-        'Teacher'
-      const { data: userRow, error: userRowError } = await supabase
-        .from('users')
-        .select('id, role')
+      // Check for profile in 'profiles' table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, role')
         .eq('id', data.user.id)
         .maybeSingle()
-
-      if (userRowError) {
-        throw userRowError
+      if (profileError) {
+        throw profileError
       }
-
-      let role = userRow?.role || ''
-
-      if (!userRow) {
-        const { data: insertedUser, error: insertUserError } = await supabase
-          .from('users')
+      let role = profile?.role || ''
+      if (!profile) {
+        // Create profile if missing
+        const { data: newProfile, error: insertProfileError } = await supabase
+          .from('profiles')
           .insert({
             id: data.user.id,
-            name: fallbackName,
+            email: data.user.email,
             role: 'teacher',
           })
           .select('id, role')
           .single()
-
-        if (insertUserError) {
-          throw insertUserError
+        if (insertProfileError) {
+          throw insertProfileError
         }
-
-        role = insertedUser?.role || 'teacher'
+        role = newProfile?.role || 'teacher'
       }
-
       if (role !== 'teacher') {
         const { error: signOutError } = await supabase.auth.signOut()
         if (signOutError) {
@@ -82,7 +67,6 @@ function TeacherLogin() {
         }
         throw new Error('This account is not allowed in the teacher portal.')
       }
-
       navigate('/teacher/dashboard')
     } catch (loginError) {
       setError(loginError.message || 'An error occurred during login')
