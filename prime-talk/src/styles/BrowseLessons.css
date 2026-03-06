@@ -1,0 +1,371 @@
+.browse-lessons-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 24px;
+}
+
+.browse-lessons-header {
+  max-width: 1100px;
+  margin: 0 auto 28px;
+}
+
+.browse-lessons-header h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 2.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.browse-back-btn {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 18px;
+  transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.browse-back-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: translateX(-2px);
+}
+
+.browse-controls {
+  max-width: 1100px;
+  margin: 0 auto 24px;
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 14px;
+}
+
+.booking-panel {
+  max-width: 1100px;
+  margin: 0 auto 22px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(18, 38, 63, 0.12);
+}
+
+.booking-panel h2 {
+  margin: 0;
+  color: #1f2a44;
+  font-size: 1.2rem;
+}
+
+.booking-panel p {
+  margin: 6px 0 12px;
+  color: #5a6072;
+  font-size: 0.92rem;
+}
+
+.teacher-list {
+  margin: 6px 0 14px;
+}
+
+.teacher-list-empty {
+  border: 1px dashed #d4d8e5;
+  border-radius: 10px;
+  padding: 12px;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.teacher-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.teacher-list-item {
+  border: 1px solid #d4d8e5;
+  border-radius: 12px;
+  background: #f8faff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.teacher-list-item:hover {
+  border-color: #667eea;
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.teacher-list-item.selected {
+  border-color: #667eea;
+  background: #e9eeff;
+}
+
+.teacher-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid #d4d8e5;
+  flex-shrink: 0;
+}
+
+.teacher-avatar.placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.teacher-meta {
+  min-width: 0;
+}
+
+.teacher-name {
+  margin: 0;
+  color: #1f2a44;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teacher-status {
+  margin: 4px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: #166534;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.teacher-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.booking-form {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 0.7fr auto;
+  gap: 10px;
+}
+
+.booking-form select,
+.booking-form input {
+  height: 42px;
+  border: 1px solid #d4d8e5;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: #2d2d2d;
+  font-size: 0.92rem;
+}
+
+.booking-form select:focus,
+.booking-form input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18);
+}
+
+.booking-form button {
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #667eea;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 0 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.booking-form button:hover:not(:disabled) {
+  background: #566bd3;
+}
+
+.booking-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.booking-feedback {
+  margin-top: 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.booking-feedback.error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #be123c;
+}
+
+.booking-feedback.success {
+  background: #ecfdf3;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.browse-search-input,
+.browse-category-select {
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 0.96rem;
+  color: #2d2d2d;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.browse-search-input:focus,
+.browse-category-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2), 0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.browse-lessons-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.loading-spinner {
+  color: #ffffff;
+  text-align: center;
+  font-size: 1.1rem;
+  padding: 48px 18px;
+}
+
+.browse-feedback {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 18px;
+  color: #4a4a4a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.browse-feedback.error {
+  color: #b42318;
+  border-left: 4px solid #b42318;
+}
+
+.browse-lessons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.browse-lesson-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 8px 24px rgba(18, 38, 63, 0.12);
+  display: flex;
+  flex-direction: column;
+  min-height: 230px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.browse-lesson-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 34px rgba(18, 38, 63, 0.2);
+}
+
+.browse-lesson-card h2 {
+  margin: 0 0 14px;
+  font-size: 1.25rem;
+  color: #1f2a44;
+  line-height: 1.3;
+  padding-right: 92px;
+}
+
+.lesson-category-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #eef2ff;
+  color: #4a57c9;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lesson-preview-section {
+  margin-bottom: 16px;
+}
+
+.lesson-preview-section p {
+  margin: 0;
+  color: #5a6072;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.read-more-btn {
+  margin-top: auto;
+  border: none;
+  border-radius: 10px;
+  background: #667eea;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.read-more-btn:hover {
+  background: #566bd3;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.35);
+}
+
+@media (max-width: 900px) {
+  .browse-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .browse-lessons-container {
+    padding: 16px;
+  }
+
+  .browse-lessons-header h1 {
+    font-size: 1.85rem;
+  }
+
+  .browse-lesson-card {
+    padding: 18px;
+    min-height: 210px;
+  }
+
+  .browse-lesson-card h2 {
+    font-size: 1.1rem;
+    padding-right: 76px;
+  }
+
+  .lesson-category-badge {
+    font-size: 0.7rem;
+    padding: 5px 9px;
+  }
+}
