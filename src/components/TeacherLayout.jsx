@@ -1,29 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import {
-  CalendarIcon,
-  ChevronDownIcon,
-  ClockIcon,
-  CloseIcon,
-  DashboardIcon,
-  EarningsIcon,
-  LogoutIcon,
-  MenuIcon,
-  MessageIcon,
-  StarIcon,
-  UserIcon,
-} from './layoutIcons'
 
 const teacherMenuItems = [
-  { label: 'Dashboard', to: '/teacher/dashboard', icon: DashboardIcon },
-  { label: 'Reservations', to: '/teacher/reservations', icon: CalendarIcon },
-  { label: 'Schedule', to: '/teacher/schedule', icon: ClockIcon },
-  { label: 'Lesson History', to: '/teacher/history', icon: ClockIcon },
-  { label: 'Earnings', to: '/teacher/earnings', icon: EarningsIcon },
-  { label: 'Reviews', to: '/teacher/reviews', icon: StarIcon },
-  { label: 'Messages', to: '/teacher/messages', icon: MessageIcon },
-  { label: 'Account', to: '/teacher/account', icon: UserIcon },
+  { label: 'Dashboard', to: '/teacher/dashboard', icon: '🏠' },
+  { label: 'My Schedule', to: '/teacher/schedule', icon: '📅' },
+  { label: 'Reservations', to: '/teacher/reservations', icon: '📋' },
+  { label: 'My Students', to: '/teacher/students', icon: '👥' },
+  { label: 'Earnings', to: '/teacher/earnings', icon: '💰' },
+  { label: 'Messages', to: '/teacher/messages', icon: '💬' },
+  { label: 'Settings', to: '/teacher/account', icon: '⚙️' },
 ]
 
 function TeacherLayout() {
@@ -131,7 +117,7 @@ function TeacherLayout() {
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
           >
-            <CloseIcon className="h-5 w-5" />
+            <span className="h-5 w-5">❌</span>
           </button>
         </div>
 
@@ -151,7 +137,7 @@ function TeacherLayout() {
                   }`
                 }
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
+                <span className="h-5 w-5 flex-shrink-0">{Icon}</span>
                 <span>{item.label}</span>
               </NavLink>
             )
@@ -164,7 +150,7 @@ function TeacherLayout() {
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
           >
-            <LogoutIcon className="h-5 w-5" />
+            <span className="h-5 w-5">🚪</span>
             <span>Logout</span>
           </button>
         </div>
@@ -188,7 +174,7 @@ function TeacherLayout() {
               onClick={() => setSidebarOpen(true)}
               aria-label="Open sidebar"
             >
-              <MenuIcon className="h-5 w-5" />
+              <span className="h-5 w-5">☰</span>
             </button>
 
             <div>
@@ -213,10 +199,10 @@ function TeacherLayout() {
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
                     {(teacherName || 'T').charAt(0).toUpperCase()}
                   </span>
-                  <span className="max-w-[120px] truncate">{teacherName}</span>
+                  <span className="max-w-[140px] truncate">Hi, {teacherName.split(' ')[0]}</span>
                 </>
               )}
-              <ChevronDownIcon className="h-4 w-4" />
+              <span className="h-4 w-4">▼</span>
             </button>
 
             {profileOpen && (

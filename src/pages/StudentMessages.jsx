@@ -1,343 +1,203 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Input } from '../components/ui/input'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-function pickProfileName(profile, fallbackId = '') {
-  return (
-    profile?.full_name ||
-    profile?.display_name ||
-    profile?.name ||
-    profile?.username ||
-    profile?.email?.split('@')?.[0] ||
-    `Teacher ${String(fallbackId).slice(0, 6)}`
-  )
-}
-
-function StudentMessages() {
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
-  const [userId, setUserId] = useState('')
-  const [selectedTeacherId, setSelectedTeacherId] = useState('')
+export default function StudentMessages() {
+  const [currentUser, setCurrentUser] = useState(null)
   const [conversations, setConversations] = useState([])
-  const [profilesById, setProfilesById] = useState({})
-  const [thread, setThread] = useState([])
-  const [messageText, setMessageText] = useState('')
-
-  const hydrateProfiles = useCallback(async (ids) => {
-    if (!ids.length) {
-      setProfilesById({})
-      return
-    }
-
-    const { data, error: profileError } = await supabase.from('profiles').select('*').in('id', ids)
-
-    if (profileError) {
-      throw profileError
-    }
-
-    const lookup = {}
-    for (const profile of data || []) {
-      lookup[profile.id] = profile
-    }
-    setProfilesById(lookup)
-  }, [])
-
-  const loadThread = useCallback(async (studentId, teacherId) => {
-    if (!studentId || !teacherId) {
-      setThread([])
-      return
-    }
-
-    const { data, error: threadError } = await supabase
-      .from('messages')
-      .select('id, teacher_id, student_id, content, created_at')
-      .eq('student_id', studentId)
-      .eq('teacher_id', teacherId)
-      .order('created_at', { ascending: true })
-      .limit(200)
-
-    if (threadError) {
-      throw threadError
-    }
-
-    setThread(data || [])
-  }, [])
-
-  const loadMessageContext = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError('')
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) {
-        throw userError
-      }
-
-      if (!user) {
-        navigate('/login', { replace: true })
-        return
-      }
-
-      setUserId(user.id)
-
-      const [messagesResult, reservationsResult, lessonsResult] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('id, teacher_id, content, created_at')
-          .eq('student_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(300),
-        supabase
-          .from('reservations')
-          .select('teacher_id, lesson_date, lesson_time')
-          .eq('student_id', user.id)
-          .order('lesson_date', { ascending: false })
-          .limit(100),
-        supabase
-          .from('lessons')
-          .select('teacher_id, created_at')
-          .eq('student_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(100),
-      ])
-
-      if (messagesResult.error) throw messagesResult.error
-      if (reservationsResult.error) throw reservationsResult.error
-      if (lessonsResult.error) throw lessonsResult.error
-
-      const conversationMap = new Map()
-
-      for (const item of messagesResult.data || []) {
-        if (!item.teacher_id || conversationMap.has(item.teacher_id)) {
-          continue
-        }
-
-        conversationMap.set(item.teacher_id, {
-          teacher_id: item.teacher_id,
-          last_message: item.content || '',
-          last_message_at: item.created_at || '',
-        })
-      }
-
-      for (const reservation of reservationsResult.data || []) {
-        if (!reservation.teacher_id || conversationMap.has(reservation.teacher_id)) {
-          continue
-        }
-
-        conversationMap.set(reservation.teacher_id, {
-          teacher_id: reservation.teacher_id,
-          last_message: '',
-          last_message_at: reservation.lesson_date
-            ? `${reservation.lesson_date}T${reservation.lesson_time || '00:00:00'}`
-            : '',
-        })
-      }
-
-      for (const lesson of lessonsResult.data || []) {
-        if (!lesson.teacher_id || conversationMap.has(lesson.teacher_id)) {
-          continue
-        }
-
-        conversationMap.set(lesson.teacher_id, {
-          teacher_id: lesson.teacher_id,
-          last_message: '',
-          last_message_at: lesson.created_at || '',
-        })
-      }
-
-      const nextConversations = Array.from(conversationMap.values()).sort((a, b) =>
-        String(b.last_message_at).localeCompare(String(a.last_message_at)),
-      )
-
-      setConversations(nextConversations)
-
-      const teacherIds = nextConversations.map((item) => item.teacher_id)
-      await hydrateProfiles(teacherIds)
-
-      const nextSelectedTeacher = teacherIds.includes(selectedTeacherId)
-        ? selectedTeacherId
-        : teacherIds[0] || ''
-
-      setSelectedTeacherId(nextSelectedTeacher)
-      await loadThread(user.id, nextSelectedTeacher)
-    } catch (loadError) {
-      setError(loadError.message)
-      setConversations([])
-      setThread([])
-    } finally {
-      setLoading(false)
-    }
-  }, [hydrateProfiles, loadThread, navigate, selectedTeacherId])
+  const [selectedUserId, setSelectedUserId] = useState(null)
+  const [selectedName, setSelectedName] = useState('')
+  const [messages, setMessages] = useState([])
+  const [newMessage, setNewMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const bottomRef = useRef(null)
 
   useEffect(() => {
-    void loadMessageContext()
-  }, [loadMessageContext])
-
-  const selectedTeacherName = useMemo(
-    () => pickProfileName(profilesById[selectedTeacherId], selectedTeacherId),
-    [profilesById, selectedTeacherId],
-  )
-
-  const handleSelectConversation = async (teacherId) => {
-    if (!teacherId || teacherId === selectedTeacherId) {
-      return
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setCurrentUser(user)
+      await loadConversations(user.id)
+      setLoading(false)
     }
+    init()
+  }, [])
 
-    setSelectedTeacherId(teacherId)
-    setError('')
-    try {
-      await loadThread(userId, teacherId)
-    } catch (threadError) {
-      setError(threadError.message)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const loadConversations = async (userId) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('sender_id, receiver_id, content, created_at')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+
+    if (!data) return
+    const seen = new Set()
+    const convos = []
+    for (const msg of data) {
+      const otherId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id
+      if (!seen.has(otherId)) {
+        seen.add(otherId)
+        convos.push({ userId: otherId, preview: msg.content, created_at: msg.created_at })
+      }
+    }
+    // Load names from profiles
+    const otherIds = convos.map(c => c.userId)
+    if (otherIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', otherIds)
+      const nameMap = {}
+      for (const p of profiles || []) nameMap[p.id] = p.full_name || p.email || 'User'
+      setConversations(convos.map(c => ({ ...c, name: nameMap[c.userId] || 'User' })))
+    } else {
+      setConversations([])
     }
   }
 
-  const handleSendMessage = async () => {
-    const content = messageText.trim()
-    if (!content || !userId || !selectedTeacherId || sending) {
-      return
+  const loadMessages = async (userId, otherUserId) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id, content, created_at')
+      .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`)
+      .order('created_at', { ascending: true })
+    setMessages(data || [])
+  }
+
+  const handleSelectConvo = async (convo) => {
+    setSelectedUserId(convo.userId)
+    setSelectedName(convo.name)
+    if (currentUser) await loadMessages(currentUser.id, convo.userId)
+  }
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !currentUser || !selectedUserId || sending) return
+    setSending(true)
+    const { error } = await supabase.from('messages').insert({
+      sender_id: currentUser.id,
+      receiver_id: selectedUserId,
+      content: newMessage.trim(),
+    })
+    if (!error) {
+      setNewMessage('')
+      await loadMessages(currentUser.id, selectedUserId)
     }
+    setSending(false)
+  }
 
-    try {
-      setSending(true)
-      setError('')
-
-      const { error: insertError } = await supabase.from('messages').insert({
-        teacher_id: selectedTeacherId,
-        student_id: userId,
-        content,
-      })
-
-      if (insertError) {
-        throw insertError
-      }
-
-      setMessageText('')
-      await loadThread(userId, selectedTeacherId)
-      await loadMessageContext()
-    } catch (sendError) {
-      setError(sendError.message)
-    } finally {
-      setSending(false)
-    }
+  const cardStyle = {
+    background: 'white', borderRadius: '16px',
+    border: '1px solid #E2E8F0', overflow: 'hidden'
   }
 
   return (
-    <section className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Messages</CardTitle>
-            <CardDescription>Send updates and questions to your teachers.</CardDescription>
+    <div style={{ padding: '0' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', marginBottom: '24px' }}>
+        💬 Messages
+      </h1>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '16px', height: '600px' }}>
+        {/* Conversations list */}
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #E2E8F0' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Conversations</h3>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => void loadMessageContext()} disabled={loading || sending}>
-              Refresh
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/student/online-teachers')}>
-              Find Teacher
-            </Button>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {loading ? (
+              <p style={{ padding: '20px', color: '#64748B', fontSize: '13px' }}>Loading...</p>
+            ) : conversations.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
+                <p style={{ fontSize: '13px' }}>No conversations yet</p>
+              </div>
+            ) : conversations.map(convo => (
+              <div key={convo.userId}
+                onClick={() => handleSelectConvo(convo)}
+                style={{
+                  padding: '14px 16px', cursor: 'pointer', borderBottom: '1px solid #F1F5F9',
+                  background: selectedUserId === convo.userId ? '#F0FFFE' : 'transparent',
+                  borderLeft: selectedUserId === convo.userId ? '3px solid #0EA5A0' : '3px solid transparent'
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: '#0EA5A0', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', color: 'white', fontWeight: 700,
+                    fontSize: '13px', flexShrink: 0
+                  }}>
+                    {(convo.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, color: '#0F172A', fontSize: '13px', margin: 0 }}>{convo.name}</p>
+                    <p style={{ fontSize: '11px', color: '#64748B', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {convo.preview || 'No messages yet'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </div>
-          )}
+        </div>
 
-          {loading ? (
-            <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-              Loading messages...
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              No conversation yet. Start a lesson or reservation first, then send a message.
+        {/* Chat panel */}
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
+          {!selectedUserId ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>💬</div>
+                <p style={{ fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>Select a conversation</p>
+                <p style={{ fontSize: '13px' }}>Choose a teacher from the list to start messaging</p>
+              </div>
             </div>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                {conversations.map((conversation) => {
-                  const isActive = selectedTeacherId === conversation.teacher_id
-                  const teacherName = pickProfileName(
-                    profilesById[conversation.teacher_id],
-                    conversation.teacher_id,
-                  )
+            <>
+              <div style={{ padding: '16px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0EA5A0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '13px' }}>
+                  {selectedName.charAt(0).toUpperCase()}
+                </div>
+                <p style={{ fontWeight: 700, color: '#0F172A', margin: 0 }}>{selectedName}</p>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {messages.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', marginTop: '40px' }}>No messages yet. Say hello!</p>
+                ) : messages.map(msg => {
+                  const isMine = msg.sender_id === currentUser?.id
                   return (
-                    <button
-                      key={conversation.teacher_id}
-                      type="button"
-                      onClick={() => void handleSelectConversation(conversation.teacher_id)}
-                      className={`w-full rounded-xl border px-3 py-2 text-left transition ${
-                        isActive
-                          ? 'border-sky-200 bg-sky-50'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-slate-900">{teacherName}</p>
-                      <p className="mt-1 truncate text-xs text-slate-500">
-                        {conversation.last_message || 'No message preview yet.'}
-                      </p>
-                    </button>
+                    <div key={msg.id} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '70%', padding: '10px 14px', borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                        background: isMine ? '#0EA5A0' : '#F1F5F9',
+                        color: isMine ? 'white' : '#0F172A', fontSize: '14px'
+                      }}>
+                        {msg.content}
+                      </div>
+                    </div>
                   )
                 })}
+                <div ref={bottomRef} />
               </div>
-
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-800">Conversation with {selectedTeacherName}</p>
-
-                <div className="max-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  {thread.length === 0 ? (
-                    <p className="text-sm text-slate-500">No messages in this conversation yet.</p>
-                  ) : (
-                    thread.map((message) => (
-                      <div key={message.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-sm text-slate-700">{message.content}</p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {new Date(message.created_at).toLocaleString('en-US')}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Input
-                    value={messageText}
-                    onChange={(event) => setMessageText(event.target.value)}
-                    placeholder="Write a message..."
-                    disabled={sending}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        void handleSendMessage()
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={() => void handleSendMessage()}
-                    disabled={sending || !messageText.trim() || !selectedTeacherId}
-                  >
-                    {sending ? 'Sending...' : 'Send Message'}
-                  </Button>
-                </div>
+              <div style={{ padding: '12px 16px', borderTop: '1px solid #E2E8F0', display: 'flex', gap: '8px' }}>
+                <input
+                  value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Type a message..."
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: '8px',
+                    border: '1px solid #E2E8F0', fontSize: '14px', outline: 'none'
+                  }} />
+                <button onClick={handleSend} disabled={sending}
+                  style={{ background: '#0EA5A0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                  {sending ? '...' : 'Send'}
+                </button>
               </div>
-            </div>
+            </>
           )}
-        </CardContent>
-      </Card>
-    </section>
+        </div>
+      </div>
+    </div>
   )
 }
-
-export default StudentMessages

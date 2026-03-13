@@ -1,8 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Input } from '../components/ui/input'
 import { supabase } from '../lib/supabaseClient'
 
 function StudentLogin() {
@@ -64,6 +61,8 @@ function StudentLogin() {
         await supabase.auth.signOut()
         throw new Error('This account is not allowed in the student portal.')
       }
+      localStorage.setItem('userRole', 'student')
+      localStorage.setItem('userRole', 'student')
       navigate('/student/dashboard')
     } catch (loginError) {
       setError(loginError.message || 'An error occurred during login')
@@ -72,92 +71,220 @@ function StudentLogin() {
     }
   }
 
+  const pageStyle = {
+    display: 'flex', minHeight: '100vh', width: '100%'
+  }
+
+  const leftStyle = {
+    width: '55%', background: 'linear-gradient(135deg, #0F172A 0%, #0EA5A0 100%)',
+    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    padding: '48px'
+  }
+
+  const rightStyle = {
+    flex: 1, background: 'white', display: 'flex', 
+    alignItems: 'center', justifyContent: 'center', padding: '48px'
+  }
+
   return (
-    <div className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.18),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(6,182,212,0.14),transparent_45%)]" />
-
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center justify-center">
-        <div className="grid w-full items-stretch gap-6 lg:grid-cols-[1fr_430px]">
-          <Card className="hidden border-slate-200 bg-white shadow-soft lg:block">
-            <CardContent className="flex h-full flex-col justify-between p-8">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">Prime Talk</p>
-                <h1 className="text-4xl font-black leading-tight text-slate-900">
-                  Practice daily with tutors who keep your momentum strong.
-                </h1>
-                <p className="text-base text-slate-600">
-                  Access sudden lessons, reservations, and progress tracking in one professional learning workspace.
-                </p>
+    <div style={pageStyle}>
+      {/* LEFT PANEL */}
+      <div style={leftStyle}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 24, fontWeight: 800, color: 'white', fontFamily: 'Syne' }}>
+            Prime
+          </span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: '#99f6e4', fontFamily: 'Syne' }}>
+            Talk
+          </span>
+        </div>
+        
+        {/* Center content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <blockquote style={{
+            fontSize: 36, color: 'white', fontFamily: 'serif', lineHeight: 1.4,
+            marginBottom: 16
+          }}>
+            "The limits of my language are the limits of my world."
+          </blockquote>
+          <p style={{ color: '#99f6e4', marginBottom: 48 }}>— Ludwig Wittgenstein</p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[
+              '✓ Instant lessons with certified teachers',
+              '✓ Schedule sessions around your life',
+              '✓ Track your progress every step'
+            ].map((feature, index) => (
+              <div key={index} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                color: 'white', fontSize: 16
+              }}>
+                <span style={{ color: '#0EA5A0', fontSize: 20 }}>✓</span>
+                <span>{feature}</span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="space-y-3 text-sm text-slate-600">
-                <p>1. Start sudden lessons instantly</p>
-                <p>2. Track reservations and lesson history</p>
-                <p>3. Build speaking confidence faster</p>
+        {/* Bottom avatars */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', gap: -8 }}>
+            {['A','B','C','D','E'].map((letter, index) => (
+              <div key={index} style={{
+                width: 32, height: 32, borderRadius: '50%', background: '#0EA5A0',
+                color: 'white', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 12, fontWeight: 700,
+                border: '2px solid white'
+              }}>
+                {letter}
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+          <span style={{ color: 'white', fontSize: 14 }}>
+            Join 2,400+ students already learning
+          </span>
+        </div>
+      </div>
 
-          <Card className="border-slate-200 bg-white text-slate-900 shadow-soft">
-            <CardHeader className="space-y-2">
-              <CardTitle className="text-2xl">Student Login</CardTitle>
-              <CardDescription>Sign in to continue your learning journey.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleLogin}>
-                <div className="space-y-2">
-                  <label htmlFor="student-email" className="text-sm font-semibold text-slate-700">
-                    Email
-                  </label>
-                  <Input
-                    id="student-email"
-                    type="email"
-                    value={email}
-                    disabled={loading}
-                    placeholder="you@example.com"
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
-                </div>
+      {/* RIGHT PANEL */}
+      <div style={rightStyle}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          
+          {/* Role tabs */}
+          <div style={{
+            display: 'flex', background: '#F1F5F9', borderRadius: 10,
+            padding: 4, marginBottom: 24
+          }}>
+            <button 
+              onClick={() => navigate('/student/login')}
+              style={{
+                flex: 1, padding: '10px', textAlign: 'center', cursor: 'pointer',
+                fontSize: 14, transition: 'all 0.2s',
+                background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', color: '#0F172A', fontWeight: 600
+              }}
+            >
+              Student
+            </button>
+            <button 
+              onClick={() => navigate('/teacher/login')}
+              style={{
+                flex: 1, padding: '10px', textAlign: 'center', cursor: 'pointer',
+                fontSize: 14, transition: 'all 0.2s',
+                color: '#64748B', background: 'transparent'
+              }}
+            >
+              Teacher
+            </button>
+          </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="student-password" className="text-sm font-semibold text-slate-700">
-                    Password
-                  </label>
-                  <Input
-                    id="student-password"
-                    type="password"
-                    value={password}
-                    disabled={loading}
-                    placeholder="Enter your password"
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                </div>
+          <h1 style={{ fontSize: 30, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+            Welcome back
+          </h1>
+          <p style={{ color: '#64748B', marginBottom: 24 }}>
+            Sign in to continue your journey
+          </p>
 
-                {error && (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-                    {error}
-                  </div>
-                )}
+          {/* Error message */}
+          {error && (
+            <div style={{
+              background: '#FEF2F2', color: '#DC2626', padding: '12px',
+              borderRadius: 8, fontSize: 14, marginBottom: 16
+            }}>
+              {error}
+            </div>
+          )}
 
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Logging in...' : 'Login as Student'}
-                </Button>
-              </form>
-
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <Link to="/" className="font-semibold text-slate-600 transition hover:text-sky-700">
-                  Back to home
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => navigate('/teacher/login')}
-                  className="font-semibold text-slate-600 transition hover:text-sky-700"
-                >
-                  Teacher login
-                </button>
+          {/* Form */}
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Email field */}
+            <div>
+              <label style={{
+                display: 'block', fontSize: 14, fontWeight: 500,
+                color: '#0F172A', marginBottom: 6
+              }}>
+                Email
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                  color: '#94A3B8'
+                }}>✉</span>
+                <input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%', padding: '12px 12px 12px 40px', border: '1.5px solid #E2E8F0',
+                    borderRadius: 8, fontSize: 14, color: '#0F172A', transition: 'all 0.2s'
+                  }}
+                  placeholder="you@example.com"
+                  required
+                />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Password field */}
+            <div>
+              <label style={{
+                display: 'block', fontSize: 14, fontWeight: 500,
+                color: '#0F172A', marginBottom: 6
+              }}>
+                Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                  color: '#94A3B8'
+                }}>🔒</span>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%', padding: '12px 40px 12px 40px', border: '1.5px solid #E2E8F0',
+                    borderRadius: 8, fontSize: 14, color: '#0F172A', transition: 'all 0.2s'
+                  }}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'right', marginBottom: 16 }}>
+              <a href="#" style={{ color: '#0EA5A0', fontSize: 13 }}>
+                Forgot password?
+              </a>
+            </div>
+
+            {/* Submit */}
+            <button 
+              type="submit" 
+              disabled={loading}
+              style={{
+                width: '100%', background: loading ? '#64748B' : '#0EA5A0',
+                color: 'white', padding: '13px', borderRadius: 8, fontSize: 15,
+                fontWeight: 600, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: 20, color: '#64748B', fontSize: 14 }}>
+            Don't have an account?{' '}
+            <a href="/register" style={{ color: '#0EA5A0', fontWeight: 600 }}>
+              Sign up
+            </a>
+          </p>
+          <p style={{ textAlign: 'center', marginTop: 12 }}>
+            <a href="/" style={{ color: '#94A3B8', fontSize: 13 }}>
+              ← Back to home
+            </a>
+          </p>
         </div>
       </div>
     </div>

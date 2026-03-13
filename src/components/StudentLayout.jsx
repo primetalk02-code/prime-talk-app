@@ -1,31 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import {
-  BookIcon,
-  CalendarIcon,
-  ChevronDownIcon,
-  CloseIcon,
-  DashboardIcon,
-  LogoutIcon,
-  MenuIcon,
-  MessageIcon,
-  SlidersIcon,
-  StarIcon,
-  TrendIcon,
-  UserIcon,
-} from './layoutIcons'
 
 const studentMenuItems = [
-  { label: 'Dashboard', to: '/student/dashboard', icon: DashboardIcon },
-  { label: 'Book Lesson', to: '/student/book-lesson', icon: BookIcon },
-  { label: 'Online Teachers', to: '/student/online-teachers', icon: TrendIcon },
-  { label: 'Reservations', to: '/student/reservations', icon: CalendarIcon },
-  { label: 'My Lessons', to: '/student/lessons', icon: CalendarIcon },
-  { label: 'Reviews', to: '/student/reviews', icon: StarIcon },
-  { label: 'Messages', to: '/student/messages', icon: MessageIcon },
-  { label: 'Preferences', to: '/student/preferences', icon: SlidersIcon },
-  { label: 'Account', to: '/student/account', icon: UserIcon },
+  { label: 'Dashboard', to: '/student/dashboard', icon: '🏠' },
+  { label: 'Book Lesson', to: '/student/book-lesson', icon: '📚' },
+  { label: 'Online Teachers', to: '/student/online-teachers', icon: '🌐' },
+  { label: 'Reservations', to: '/student/reservations', icon: '📋' },
+  { label: 'My Lessons', to: '/student/lessons', icon: '🎓' },
+  { label: 'Reviews', to: '/student/reviews', icon: '⭐' },
+  { label: 'Messages', to: '/student/messages', icon: '💬' },
+  { label: 'Account', to: '/student/account', icon: '👤' },
 ]
 
 function StudentLayout() {
@@ -133,7 +118,7 @@ function StudentLayout() {
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
           >
-            <CloseIcon className="h-5 w-5" />
+            <span className="h-5 w-5">❌</span>
           </button>
         </div>
 
@@ -153,7 +138,7 @@ function StudentLayout() {
                   }`
                 }
               >
-                <Icon className="h-5 w-5" />
+                <span className="h-5 w-5">{Icon}</span>
                 <span>{item.label}</span>
               </NavLink>
             )
@@ -166,7 +151,7 @@ function StudentLayout() {
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
           >
-            <LogoutIcon className="h-5 w-5" />
+            <span className="h-5 w-5">🚪</span>
             <span>Logout</span>
           </button>
         </div>
@@ -190,7 +175,7 @@ function StudentLayout() {
               onClick={() => setSidebarOpen(true)}
               aria-label="Open sidebar"
             >
-              <MenuIcon className="h-5 w-5" />
+              <span className="h-5 w-5">☰</span>
             </button>
 
             <div>
@@ -218,7 +203,7 @@ function StudentLayout() {
                   <span className="max-w-[120px] truncate">{studentName}</span>
                 </>
               )}
-              <ChevronDownIcon className="h-4 w-4" />
+              <span className="h-4 w-4">▼</span>
             </button>
 
             {profileOpen && (

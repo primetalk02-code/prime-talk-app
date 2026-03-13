@@ -74,7 +74,7 @@ const buildTimeSlots = () => {
 
 function TeacherSchedule() {
   const [user, setUser] = useState(null)
-  const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()))
+  const [weekStart, setWeekStart] = useState(() => { const d = new Date(); d.setHours(0,0,0,0); return d })
   const [availabilityByKey, setAvailabilityByKey] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -89,10 +89,10 @@ function TeacherSchedule() {
   const timeSlots = useMemo(() => buildTimeSlots(), [])
 
   const weekDays = useMemo(() => {
-    return DAY_NAMES.map((label, index) => {
+    return Array.from({ length: 7 }, (_, index) => {
       const date = addDays(weekStart, index)
       return {
-        label,
+        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
         dateIso: formatDateYmd(date),
         shortDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       }
@@ -308,10 +308,18 @@ function TeacherSchedule() {
     setSelectionFromSet(nextSet)
   }
 
+  const isSlotInPast = useCallback((dateIso, timeSlot) => {
+    const now = new Date()
+    const slotDate = new Date(dateIso + 'T' + timeSlot + ':00')
+    return slotDate <= now
+  }, [])
+
   const handleCellMouseDown = (event, dayDate, slotValue) => {
     if (loading || saving) {
       return
     }
+
+    if (isSlotInPast(dayDate, slotValue)) return
 
     event.preventDefault()
     setError('')
@@ -359,7 +367,7 @@ function TeacherSchedule() {
           </div>
 
           <div className="week-controls">
-            <button type="button" onClick={() => moveWeek(-1)} disabled={loading || saving}>
+            <button type="button" onClick={() => moveWeek(-1)} disabled={loading || saving || addDays(weekStart, -7) < new Date().setHours(0,0,0,0)}>
               Prev
             </button>
             <div className="week-range">{weekRangeLabel}</div>
@@ -454,10 +462,15 @@ function TeacherSchedule() {
                         const cellKey = buildCellKey(day.dateIso, timeSlot.time_slot)
                         const slotStatus = availabilityByKey[cellKey]?.status || 'unavailable'
                         const isSelected = selectedLookup.has(cellKey)
+                        const isPast = isSlotInPast(day.dateIso, timeSlot.time_slot)
 
-                        const slotClass = `schedule-cell status-${slotStatus}${
+                        let slotClass = `schedule-cell status-${slotStatus}${
                           isSelected ? ' status-selected' : ''
                         }`
+                        
+                        if (isPast) {
+                          slotClass += ' status-past'
+                        }
 
                         return (
                           <td
@@ -468,7 +481,11 @@ function TeacherSchedule() {
                             onMouseUp={() => setIsDragging(false)}
                             role="presentation"
                           >
-                            {renderCellContent(slotStatus)}
+                            {isPast ? (
+                              <span className="slot-text" style={{ color: '#CBD5E1' }}>—</span>
+                            ) : (
+                              renderCellContent(slotStatus)
+                            )}
                           </td>
                         )
                       })}

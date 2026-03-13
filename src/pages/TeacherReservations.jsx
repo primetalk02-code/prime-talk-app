@@ -1,164 +1,164 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { useAuth } from '../lib/authContext.jsx'
 import { supabase } from '../lib/supabaseClient'
 
-function pickStudentName(profile, studentId = '') {
-  return (
-    profile?.full_name ||
-    profile?.display_name ||
-    profile?.name ||
-    profile?.username ||
-    profile?.email?.split('@')?.[0] ||
-    `Student ${String(studentId).slice(0, 6)}`
-  )
-}
-
-function TeacherReservations() {
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
+export default function TeacherReservations() {
   const [reservations, setReservations] = useState([])
-  const [profilesById, setProfilesById] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [studentNames, setStudentNames] = useState({})
 
-  const loadReservations = useCallback(async (silent = false) => {
+  useEffect(() => { loadReservations() }, [])
+
+  const loadReservations = async () => {
+    setLoading(true)
     try {
-      if (silent) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
-      setError('')
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) {
-        throw userError
-      }
-
-      if (!user) {
-        navigate('/login', { replace: true })
-        return
-      }
-
-      const { data, error: reservationError } = await supabase
-        .from('reservations')
-        .select('id, student_id, lesson_date, lesson_time')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('id, student_id, status, duration, source, created_at, textbook')
         .eq('teacher_id', user.id)
-        .order('lesson_date', { ascending: true })
-        .order('lesson_time', { ascending: true })
-        .limit(300)
-
-      if (reservationError) {
-        throw reservationError
-      }
-
-      const nextReservations = data || []
-      setReservations(nextReservations)
-
-      const studentIds = Array.from(new Set(nextReservations.map((item) => item.student_id))).filter(Boolean)
+        .in('status', ['waiting', 'active'])
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setReservations(data || [])
+      // Fetch student names
+      const studentIds = [...new Set((data||[]).map(r => r.student_id).filter(Boolean))]
       if (studentIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
+        const { data: profiles } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, email')
           .in('id', studentIds)
-
-        if (profilesError) {
-          throw profilesError
+        const nameMap = {}
+        for (const p of profiles || []) {
+          nameMap[p.id] = p.full_name || p.email?.split('@')[0] || 'Student'
         }
-
-        const lookup = {}
-        for (const profile of profiles || []) {
-          lookup[profile.id] = profile
-        }
-        setProfilesById(lookup)
-      } else {
-        setProfilesById({})
+        setStudentNames(nameMap)
       }
-    } catch (loadError) {
-      setError(loadError.message)
-      setReservations([])
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    } catch(e) {
+      setError(e.message)
     }
-  }, [navigate])
+    setLoading(false)
+  }
 
-  useEffect(() => {
-    void loadReservations()
-  }, [loadReservations])
+  const handleAccept = async (id) => {
+    await supabase.from('lessons').update({ status: 'active' }).eq('id', id)
+    loadReservations()
+  }
 
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const upcomingReservations = useMemo(
-    () => reservations.filter((reservation) => reservation.lesson_date >= todayIso),
-    [reservations, todayIso],
-  )
+  const handleDecline = async (id) => {
+    await supabase.from('lessons').update({ status: 'declined' }).eq('id', id)
+    loadReservations()
+  }
+
+  const formatCreated = (created_at) => {
+    if (!created_at) return 'Just now'
+    return new Date(created_at).toLocaleDateString('en-US', 
+      { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
 
   return (
-    <section className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Reservations</CardTitle>
-            <CardDescription>Review upcoming bookings and enter reserved lesson rooms.</CardDescription>
-          </div>
-          <Button variant="secondary" onClick={() => void loadReservations(true)} disabled={loading || refreshing}>
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </div>
-          )}
+    <div style={{padding:'0'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px'}}>
+        <div>
+          <h1 style={{fontSize:'24px', fontWeight:800, color:'#0F172A', margin:0}}>
+            📋 Reservations
+          </h1>
+          <p style={{color:'#64748B', fontSize:'14px', marginTop:'4px'}}>
+            Incoming lesson requests and bookings
+          </p>
+        </div>
+        <button onClick={loadReservations}
+          style={{background:'white', border:'1px solid #E2E8F0', padding:'8px 16px',
+                  borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontWeight:600, color:'#64748B'}}>
+          🔄 Refresh
+        </button>
+      </div>
 
-          {loading ? (
-            <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-              Loading reservations...
-            </div>
-          ) : upcomingReservations.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-              No upcoming reservations.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {upcomingReservations.map((reservation) => (
-                <article
-                  key={reservation.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card"
-                >
+      {error && (
+        <div style={{background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:'8px',
+                     padding:'12px', marginBottom:'16px', color:'#DC2626', fontSize:'14px'}}>
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{textAlign:'center', padding:'60px', color:'#64748B'}}>
+          <div style={{fontSize:'32px', marginBottom:'12px'}}>⏳</div>
+          <p>Loading reservations...</p>
+        </div>
+      ) : reservations.length === 0 ? (
+        <div style={{background:'white', borderRadius:'16px', border:'1px solid #E2E8F0',
+                     padding:'48px', textAlign:'center'}}>
+          <div style={{fontSize:'48px', marginBottom:'16px'}}>📭</div>
+          <p style={{fontSize:'16px', fontWeight:700, color:'#0F172A', marginBottom:'8px'}}>
+            No pending reservations
+          </p>
+          <p style={{color:'#64748B', fontSize:'14px'}}>
+            New bookings will appear here automatically
+          </p>
+        </div>
+      ) : (
+        <div style={{display:'grid', gap:'12px'}}>
+          {reservations.map(r => (
+            <div key={r.id}
+              style={{background:'white', borderRadius:'12px', border:'1px solid #E2E8F0',
+                      padding:'20px', display:'flex', justifyContent:'space-between',
+                      alignItems:'center', gap:'16px'}}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
+                  <div style={{width:'40px', height:'40px', borderRadius:'50%',
+                               background:'#0EA5A0', display:'flex', alignItems:'center',
+                               justifyContent:'center', color:'white', fontWeight:700, fontSize:'14px'}}>
+                    👤
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {reservation.lesson_date} {String(reservation.lesson_time || '').slice(0, 5)}
+                    <p style={{fontWeight:700, color:'#0F172A', margin:0, fontSize:'15px'}}>
+                      {studentNames[r.student_id] || 'Student'}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Student:{' '}
-                      {pickStudentName(profilesById[reservation.student_id], reservation.student_id)}
+                    <p style={{fontSize:'12px', color:'#64748B', margin:0}}>
+                      {r.source === 'sudden' ? '⚡ Instant lesson' : '📅 Scheduled'} · {r.duration || 25} min
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => navigate(`/lesson-room/${reservation.id}`)}>
-                      Enter Room
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/teacher/messages')}>
-                      Message Student
-                    </Button>
-                  </div>
-                </article>
-              ))}
+                </div>
+                <p style={{fontSize:'13px', color:'#64748B', margin:0}}>
+                  🗓 {formatCreated(r.created_at)}
+                </p>
+                <div style={{marginTop:'6px'}}>
+                  <span style={{
+                    display:'inline-block', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:600,
+                    background: r.status === 'waiting' ? '#FEF9C3' : '#DCFCE7',
+                    color: r.status === 'waiting' ? '#CA8A04' : '#16A34A'
+                  }}>
+                    {r.status === 'waiting' ? '⏳ Waiting' : '✅ Active'}
+                  </span>
+                </div>
+              </div>
+              {r.status === 'waiting' && (
+                <div style={{display:'flex', gap:'8px', flexShrink:0}}>
+                  <button onClick={() => handleAccept(r.id)}
+                    style={{background:'#0EA5A0', color:'white', border:'none',
+                            padding:'10px 18px', borderRadius:'8px', cursor:'pointer',
+                            fontWeight:600, fontSize:'13px'}}>
+                    ✅ Accept
+                  </button>
+                </div>
+              )}
+              {r.status === 'active' && (
+                <button
+                  onClick={() => window.location.href = `/lesson/${r.id}`}
+                  style={{background:'#0EA5A0', color:'white', border:'none',
+                          padding:'10px 20px', borderRadius:'8px', cursor:'pointer',
+                          fontWeight:700, fontSize:'13px', marginLeft:'8px'}}>
+                  🎥 Join Lesson →
+                </button>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </section>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
-
-export default TeacherReservations

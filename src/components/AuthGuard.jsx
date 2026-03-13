@@ -1,48 +1,31 @@
-import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { useAuth } from "../lib/authContext.jsx";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function AuthGuard({ children }) {
-  const [checking, setChecking] = useState(true)
-  const [hasSession, setHasSession] = useState(false)
+  const { user, role, teacherStatus } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    let isMounted = true
-
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (isMounted) {
-        setHasSession(Boolean(session))
-        setChecking(false)
-      }
+    if (!user) {
+      navigate("/login");
+      return;
     }
-
-    checkSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) {
-        setHasSession(Boolean(session))
+    console.log("Logged in user:", user.id);
+    console.log("User role:", role);
+    console.log("Teacher status:", teacherStatus);
+    if (role === "teacher") {
+      if (teacherStatus === "pending") {
+        navigate("/apply-teacher");
+      } else if (teacherStatus === "approved") {
+        navigate("/teacher/dashboard");
+      } else {
+        navigate("/apply-teacher");
       }
-    })
-
-    return () => {
-      isMounted = false
-      subscription.unsubscribe()
+    } else if (role === "student") {
+      navigate("/student/dashboard");
     }
-  }, [])
+  }, [user, role, teacherStatus, navigate]);
 
-  if (checking) {
-    return null
-  }
-
-  if (!hasSession) {
-    return <Navigate to="/login" replace />
-  }
-
-  return children
+  return children;
 }

@@ -1,274 +1,116 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Input } from '../components/ui/input'
 import { supabase } from '../lib/supabaseClient'
 
-function pickTeacherName(teacher) {
-  return (
-    teacher.full_name ||
-    teacher.display_name ||
-    teacher.name ||
-    teacher.username ||
-    teacher.email ||
-    'Teacher'
-  )
-}
-
-function StudentReservations() {
+export default function StudentReservations() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [userId, setUserId] = useState('')
-  const [teachers, setTeachers] = useState([])
   const [reservations, setReservations] = useState([])
-  const [teacherId, setTeacherId] = useState('')
-  const [lessonDate, setLessonDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [lessonTime, setLessonTime] = useState('09:00')
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
 
-  const loadReservations = useCallback(async (silent = false) => {
-    try {
-      if (silent) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
-      setError('')
-      setSuccess('')
+  useEffect(() => { load() }, [])
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) {
-        throw userError
-      }
-
-      if (!user) {
-        navigate('/login', { replace: true })
-        return
-      }
-
-      setUserId(user.id)
-
-      const [teachersResult, reservationsResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('role', 'teacher')
-          .order('full_name', { ascending: true }),
-        supabase
-          .from('reservations')
-          .select('id, teacher_id, lesson_date, lesson_time')
-          .eq('student_id', user.id)
-          .order('lesson_date', { ascending: true })
-          .order('lesson_time', { ascending: true })
-          .limit(200),
-      ])
-
-      if (teachersResult.error) throw teachersResult.error
-      if (reservationsResult.error) throw reservationsResult.error
-
-      const teacherList = teachersResult.data || []
-      setTeachers(teacherList)
-      setReservations(reservationsResult.data || [])
-      setTeacherId((current) => {
-        if (teacherList.length === 0) {
-          return ''
-        }
-        if (teacherList.some((teacher) => teacher.id === current)) {
-          return current
-        }
-        return teacherList[0].id
-      })
-    } catch (loadError) {
-      setError(loadError.message)
-      setTeachers([])
-      setReservations([])
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    void loadReservations()
-  }, [loadReservations])
-
-  const teacherNameById = useMemo(() => {
-    const map = {}
-    for (const teacher of teachers) {
-      map[teacher.id] = pickTeacherName(teacher)
-    }
-    return map
-  }, [teachers])
-
-  const handleCreateReservation = async (event) => {
-    event.preventDefault()
-
-    if (!userId || !teacherId || !lessonDate || !lessonTime || saving) {
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError('')
-      setSuccess('')
-
-      const normalizedTime = lessonTime.length === 5 ? `${lessonTime}:00` : lessonTime
-
-      const { error: insertError } = await supabase.from('reservations').insert({
-        student_id: userId,
-        teacher_id: teacherId,
-        lesson_date: lessonDate,
-        lesson_time: normalizedTime,
-      })
-
-      if (insertError) {
-        throw insertError
-      }
-
-      setSuccess('Reservation created.')
-      await loadReservations(true)
-    } catch (createError) {
-      setError(createError.message)
-    } finally {
-      setSaving(false)
-    }
+  const load = async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('lessons')
+      .select('id, teacher_id, status, duration, source, textbook, created_at')
+      .eq('student_id', user.id)
+      .order('created_at', { ascending: false })
+    setReservations(data || [])
+    setLoading(false)
   }
 
+  const statusColor = (s) => ({
+    waiting: { bg: '#FEF9C3', color: '#CA8A04', label: '⏳ Waiting' },
+    active:  { bg: '#DCFCE7', color: '#16A34A', label: '✅ Active' },
+    finished:{ bg: '#F1F5F9', color: '#64748B', label: '✓ Finished' },
+    declined:{ bg: '#FEF2F2', color: '#DC2626', label: '✗ Declined' },
+  }[s] || { bg: '#F1F5F9', color: '#64748B', label: s })
+
+  const filtered = filter === 'all' ? reservations 
+    : reservations.filter(r => r.status === filter)
+
   return (
-    <section className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Reservations</CardTitle>
-            <CardDescription>Book upcoming sessions and enter scheduled lesson rooms.</CardDescription>
-          </div>
-          <Button variant="secondary" onClick={() => void loadReservations(true)} disabled={loading || refreshing}>
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </div>
-          )}
+    <div style={{ padding: '0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', margin: 0 }}>📋 Reservations</h1>
+          <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px' }}>Your lesson bookings</p>
+        </div>
+        <button onClick={() => navigate('/student/book-lesson')}
+          style={{ background: '#0EA5A0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+          + Book Lesson
+        </button>
+      </div>
 
-          {success && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-              {success}
-            </div>
-          )}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        {['all', 'waiting', 'active', 'finished', 'declined'].map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{
+              padding: '6px 14px', borderRadius: '20px', border: 'none',
+              cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              background: filter === f ? '#0EA5A0' : '#F1F5F9',
+              color: filter === f ? 'white' : '#64748B',
+              textTransform: 'capitalize'
+            }}>
+            {f}
+          </button>
+        ))}
+      </div>
 
-          <form onSubmit={handleCreateReservation} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
-            <div className="md:col-span-2">
-              <label htmlFor="reservation-teacher" className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                Teacher
-              </label>
-              <select
-                id="reservation-teacher"
-                value={teacherId}
-                onChange={(event) => setTeacherId(event.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                disabled={saving || teachers.length === 0}
-                required
-              >
-                {teachers.length === 0 ? (
-                  <option value="">No teacher available</option>
-                ) : (
-                  teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {pickTeacherName(teacher)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="reservation-date" className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                Date
-              </label>
-              <Input
-                id="reservation-date"
-                type="date"
-                value={lessonDate}
-                onChange={(event) => setLessonDate(event.target.value)}
-                min={new Date().toISOString().slice(0, 10)}
-                disabled={saving}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="reservation-time" className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                Time
-              </label>
-              <Input
-                id="reservation-time"
-                type="time"
-                value={lessonTime}
-                onChange={(event) => setLessonTime(event.target.value)}
-                step="1800"
-                disabled={saving}
-                required
-              />
-            </div>
-            <div className="md:col-span-4 flex flex-wrap gap-2">
-              <Button type="submit" disabled={saving || !teacherId}>
-                {saving ? 'Booking...' : 'Create Reservation'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/student/book-lesson')}>
-                Open Lesson Browser
-              </Button>
-            </div>
-          </form>
-
-          {loading ? (
-            <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-              Loading reservations...
-            </div>
-          ) : reservations.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-              No reservations yet.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {reservations.map((reservation) => (
-                <article
-                  key={reservation.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card"
-                >
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#64748B' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+          <p>Loading reservations...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '48px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
+          <p style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>No reservations yet</p>
+          <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Book a lesson to get started</p>
+          <button onClick={() => navigate('/student/book-lesson')}
+            style={{ background: '#0EA5A0', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}>
+            Browse Teachers
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {filtered.map(r => {
+            const s = statusColor(r.status)
+            return (
+              <div key={r.id} style={{ background: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#F0FFFE', border: '2px solid #0EA5A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                    🎓
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {reservation.lesson_date} {String(reservation.lesson_time || '').slice(0, 5)}
+                    <p style={{ fontWeight: 700, color: '#0F172A', margin: 0, fontSize: '15px' }}>
+                      {r.textbook || 'English Lesson'} · {r.duration || 25} min
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Teacher: {teacherNameById[reservation.teacher_id] || String(reservation.teacher_id).slice(0, 8)}
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0' }}>
+                      {r.source === 'sudden' ? '⚡ Instant' : '📅 Scheduled'} · {new Date(r.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => navigate(`/lesson-room/${reservation.id}`)}>
-                      Enter Room
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/student/messages')}>
-                      Message Teacher
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </section>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: s.bg, color: s.color }}>
+                    {s.label}
+                  </span>
+                  {r.status === 'active' && (
+                    <button onClick={() => navigate(`/lesson/${r.id}`)}
+                      style={{ background: '#0EA5A0', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                      Join →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
-
-export default StudentReservations

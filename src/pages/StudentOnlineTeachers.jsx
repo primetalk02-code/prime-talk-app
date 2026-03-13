@@ -228,98 +228,43 @@ function StudentOnlineTeachers() {
     }
   }, [currentUser, lessonDuration, preferredLessonMode, savingPreference, textbook])
 
-  const handleStartSuddenLesson = async () => {
-    if (!currentUser || isMatching) {
-      return
-    }
-
+  const handleRequestTeacher = async (teacher) => {
+    if (!currentUser || isMatching) return
+    setIsMatching(true)
+    setError('')
+    setMatchMessage(`Sending request to ${teacher.full_name}...`)
     try {
-      setError('')
-      setIsMatching(true)
-      setMatchMessage('Searching for available teachers...')
-
-      await saveQuickPreferences()
-
-      const preferredWindow = getPreferredWindow()
-
-      const { data: lockResult, error: lockError } = await supabase.rpc('acquire_sudden_matching_lock')
-
-      if (lockError) {
-        throw lockError
-      }
-
-      const lockAcquired = Boolean(lockResult)
-
-      if (!lockAcquired) {
-        setMatchMessage('Another matching request is running. Please wait and try again.')
-        return
-      }
-
-      const triedTeacherIds = new Set()
-      let matchedLessonId = ''
-
-      while (true) {
-        const availableTeachers = await findAvailableSuddenLessonTeachers({
-          preferredLessonDay: preferredWindow.day,
-          preferredLessonTime: preferredWindow.time,
-          limit: 30,
+      const { data: lesson, error: insertError } = await supabase
+        .from('lessons')
+        .insert({
+          teacher_id: teacher.id,
+          student_id: currentUser.id,
+          duration: lessonDuration,
+          textbook: textbook,
+          status: 'waiting',
+          source: 'sudden',
         })
-        const teacher = availableTeachers.find((candidate) => !triedTeacherIds.has(candidate.id))
-
-        if (!teacher) {
-          break
+        .select('id')
+        .single()
+      if (insertError) throw insertError
+      setMatchMessage('Request sent! Waiting for teacher to accept...')
+      // Poll for acceptance for 30 seconds
+      let attempts = 0
+      const pollInterval = setInterval(async () => {
+        attempts++
+        const { data: lessonData } = await supabase
+          .from('lessons').select('status').eq('id', lesson.id).single()
+        if (lessonData?.status === 'active') {
+          clearInterval(pollInterval)
+          window.location.href = `/lesson/${lesson.id}`
+        } else if (lessonData?.status === 'declined' || attempts > 30) {
+          clearInterval(pollInterval)
+          setMatchMessage('Teacher did not respond. Try another teacher.')
+          setIsMatching(false)
         }
-
-        triedTeacherIds.add(teacher.id)
-        const teacherName = pickTeacherName(teacher)
-        setMatchMessage(`Sending request to ${teacherName}...`)
-        setCountdownSeconds(requestTimeoutSeconds)
-
-        try {
-          const lesson = await createPendingLessonRequest({
-            teacherId: teacher.id,
-            studentId: currentUser.id,
-            duration: lessonDuration,
-            textbook,
-            source: 'sudden',
-          })
-
-          const decision = await waitForLessonDecision(lesson.id, SUDDEN_LESSON_REQUEST_TIMEOUT_MS, {
-            onTick: (remaining) => {
-              setCountdownSeconds(remaining)
-            },
-          })
-
-          if (decision === LESSON_ACTIVE_STATUS) {
-            matchedLessonId = lesson.id
-            break
-          }
-
-          setMatchMessage(`${teacherName} did not accept. Trying next teacher...`)
-          setCountdownSeconds(0)
-        } catch (matchError) {
-          console.error('Failed sudden lesson request for teacher:', teacher.id, matchError)
-          setMatchMessage(`Could not request ${teacherName}. Trying next teacher...`)
-        }
-      }
-
-      setCountdownSeconds(0)
-
-      if (matchedLessonId) {
-        await supabase.rpc('release_sudden_matching_lock').catch(() => {})
-        window.location.href = `/lesson/${matchedLessonId}`
-        return
-      }
-
-      setMatchMessage('No teachers available at that time. Please adjust your preference and try again.')
-    } catch (startError) {
-      setError(startError.message)
-    } finally {
-      try {
-        await supabase.rpc('release_sudden_matching_lock')
-      } catch {
-        // ignore release errors
-      }
+      }, 1000)
+    } catch (e) {
+      setError(e.message)
       setIsMatching(false)
     }
   }
@@ -338,22 +283,22 @@ function StudentOnlineTeachers() {
     <section className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Find Teacher</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Pick duration and preferred lesson time, then start matching.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">⚡ Instant Lesson</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+            Pick a teacher and start a lesson right now
           </p>
         </div>
         <button
           type="button"
           onClick={() => void handleRefreshTeachers()}
           disabled={loading}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Refresh
         </button>
       </header>
 
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+      <div className="space-y-4 glass border-0 shadow-xl p-4">
         <div className="grid gap-4 lg:grid-cols-3">
           <DurationSelector
             value={lessonDuration}
@@ -363,7 +308,7 @@ function StudentOnlineTeachers() {
           />
 
           <div>
-            <label htmlFor="textbook-select" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label htmlFor="textbook-select" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Textbook
             </label>
             <select
@@ -371,7 +316,7 @@ function StudentOnlineTeachers() {
               value={textbook}
               onChange={(event) => setTextbook(event.target.value)}
               disabled={isMatching}
-              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+              className="h-11 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 px-3 text-sm text-slate-700 dark:text-white outline-none transition focus:border-sky-400 dark:focus:border-cyan-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-cyan-900"
             >
               {TEXTBOOK_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -382,7 +327,7 @@ function StudentOnlineTeachers() {
           </div>
 
           <div>
-            <p className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Preferred Time</p>
+            <p className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Preferred Time</p>
             <div className="flex flex-wrap gap-2">
               {LESSON_TIME_OPTIONS.map((option) => (
                 <button
@@ -390,10 +335,10 @@ function StudentOnlineTeachers() {
                   type="button"
                   onClick={() => setPreferredLessonMode(option.value)}
                   disabled={isMatching}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-all duration-200 shadow hover:scale-105 focus:ring-2 focus:ring-sky-400 dark:focus:ring-cyan-400 ${
                     preferredLessonMode === option.value
-                      ? 'border-sky-500 bg-sky-50 text-sky-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                      ? 'border-sky-500 bg-sky-50 dark:bg-cyan-900/40 text-sky-700 dark:text-cyan-200 shadow-md animate-pulse'
+                      : 'border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   {option.label}
@@ -406,7 +351,7 @@ function StudentOnlineTeachers() {
         {preferredLessonMode === 'scheduled' && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="preferred-day" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label htmlFor="preferred-day" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                 Preferred Day
               </label>
               <input
@@ -416,11 +361,11 @@ function StudentOnlineTeachers() {
                 value={preferredLessonDate}
                 disabled={isMatching}
                 onChange={(event) => setPreferredLessonDate(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className="h-11 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 px-3 text-sm text-slate-700 dark:text-white outline-none transition focus:border-sky-400 dark:focus:border-cyan-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-cyan-900"
               />
             </div>
             <div>
-              <label htmlFor="preferred-clock" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label htmlFor="preferred-clock" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                 Preferred Time
               </label>
               <input
@@ -429,7 +374,7 @@ function StudentOnlineTeachers() {
                 value={preferredLessonClock}
                 disabled={isMatching}
                 onChange={(event) => setPreferredLessonClock(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className="h-11 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 px-3 text-sm text-slate-700 dark:text-white outline-none transition focus:border-sky-400 dark:focus:border-cyan-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-cyan-900"
               />
             </div>
           </div>
@@ -438,39 +383,53 @@ function StudentOnlineTeachers() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => void handleStartSuddenLesson()}
-            disabled={loading || isMatching || !currentUser || savingPreference}
-            className="h-11 rounded-xl bg-sky-600 px-4 text-sm font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => void handleRefreshTeachers()}
+            disabled={loading}
+            className="h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isMatching ? 'Matching Teacher...' : 'Start Lesson'}
+            Refresh Teachers
           </button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {matchMessage && <p className="text-sm font-medium text-slate-600">{matchMessage}</p>}
+        {matchMessage && <p className="text-sm font-medium text-slate-600 dark:text-slate-200">{matchMessage}</p>}
         {isMatching && countdownSeconds > 0 && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/40 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-200 animate-pulse">
             Waiting for teacher: {countdownSeconds}s
           </p>
         )}
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-900/40 p-4 text-sm font-medium text-rose-700 dark:text-rose-200 animate-fade-up">
           {error}
         </div>
       )}
 
+      {isMatching && (
+        <div style={{position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)',
+                     background:'#0F172A', color:'white', padding:'16px 24px',
+                     borderRadius:'12px', fontSize:'14px', fontWeight:600,
+                     boxShadow:'0 8px 24px rgba(0,0,0,0.3)', zIndex:999}}>
+          ⏳ {matchMessage || 'Waiting for teacher to accept...'}
+          <button onClick={() => { setIsMatching(false); setMatchMessage('') }}
+            style={{marginLeft:'16px', background:'rgba(255,255,255,0.1)', border:'none',
+                    color:'white', padding:'4px 10px', borderRadius:'6px', cursor:'pointer'}}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {loading ? (
-        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-sky-200 bg-white shadow-card">
-          <div className="inline-flex items-center gap-2 rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-700">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-sky-200 bg-white dark:bg-slate-900 shadow-card">
+          <div className="inline-flex items-center gap-2 rounded-xl bg-sky-100 dark:bg-cyan-900/40 px-4 py-2 text-sm font-semibold text-sky-700 dark:text-cyan-200">
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700 dark:border-cyan-700 dark:border-t-cyan-200" />
             <span>Loading available teachers...</span>
           </div>
         </div>
       ) : teachers.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-card">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 text-sm text-slate-600 dark:text-slate-300 shadow-card">
           No teachers are available for the selected time.
         </div>
       ) : (
@@ -481,24 +440,36 @@ function StudentOnlineTeachers() {
             return (
               <article
                 key={teacher.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card"
+                className="glass border-0 shadow-card p-5 hover:shadow-lg hover:-translate-y-1 transition-all"
               >
                 <div className="flex items-center gap-3">
                   {teacherPhoto ? (
                     <img
                       src={teacherPhoto}
                       alt={teacherName}
-                      className="h-14 w-14 rounded-full border border-slate-200 object-cover"
+                      className="h-14 w-14 rounded-full border border-slate-200 dark:border-slate-700 object-cover shadow"
                     />
                   ) : (
-                    <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-lg font-bold text-sky-700">
+                    <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 dark:bg-cyan-900 text-lg font-bold text-sky-700 dark:text-cyan-200 shadow">
                       {(teacherName || 'T').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <p className="text-base font-bold text-slate-900">{teacherName}</p>
-                    <p className="text-xs font-semibold text-emerald-600">AVAILABLE</p>
+                    <p className="text-base font-bold text-slate-900 dark:text-white">{teacherName}</p>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" title="Online" />
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">AVAILABLE</span>
+                    </span>
                   </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => handleRequestTeacher(teacher)}
+                    disabled={isMatching}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-sky-400 to-cyan-400 text-white font-bold px-4 py-2 text-sm shadow-md hover:from-sky-500 hover:to-cyan-500 hover:scale-[1.02] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isMatching ? '⏳ Waiting for teacher...' : '⚡ Join Now'}
+                  </button>
                 </div>
               </article>
             )

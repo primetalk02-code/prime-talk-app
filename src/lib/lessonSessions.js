@@ -165,16 +165,42 @@ export async function completeLesson(lessonId) {
   }
 }
 
-export async function saveLessonHistoryRecord({ lessonId, durationCompleted = 0 }) {
+function normalizeIsoOrNull(value) {
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toISOString()
+}
+
+export async function saveLessonHistoryRecord({
+  lessonId,
+  teacherId = null,
+  studentId = null,
+  startedAt = null,
+  endedAt = null,
+  durationCompleted = 0,
+}) {
   if (!lessonId) {
     return
   }
 
   const safeDuration = Math.max(0, Math.round(Number(durationCompleted) || 0))
+  const normalizedStartedAt = normalizeIsoOrNull(startedAt)
+  const normalizedEndedAt = normalizeIsoOrNull(endedAt)
 
   const { error } = await supabase.from('lesson_history').upsert(
     {
       lesson_id: lessonId,
+      teacher_id: teacherId || null,
+      student_id: studentId || null,
+      started_at: normalizedStartedAt,
+      ended_at: normalizedEndedAt,
       duration_completed: safeDuration,
     },
     {
@@ -403,4 +429,3 @@ export async function waitForLessonDecision(
       .subscribe()
   })
 }
-

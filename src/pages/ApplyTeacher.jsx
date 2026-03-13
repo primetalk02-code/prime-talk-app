@@ -72,76 +72,29 @@ function ApplyTeacher() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#f7f8fc',
-        }}
-      >
-        <div
-          role="status"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '10px 14px',
-            borderRadius: '10px',
-            background: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            color: '#1d4ed8',
-            fontWeight: 700,
-          }}
-        >
-          <span
-            style={{
-              width: '16px',
-              height: '16px',
-              border: '2px solid #bfdbfe',
-              borderTopColor: '#1d4ed8',
-              borderRadius: '999px',
-              animation: 'applyTeacherSpin 0.8s linear infinite',
-            }}
-          />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 font-semibold">
+          <span className="w-4 h-4 border-2 border-blue-100 border-t-blue-600 rounded-full animate-spin"></span>
           <span>Loading...</span>
         </div>
-
-        <style>{`
-          @keyframes applyTeacherSpin {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', padding: '24px', background: '#f7f8fc' }}>
-      <div
-        style={{
-          maxWidth: '680px',
-          margin: '0 auto',
-          background: '#ffffff',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
-        }}
-      >
-        <h1 style={{ marginTop: 0 }}>Apply as Teacher</h1>
-        <p>Submit your request to become a teacher. Admin approval is required.</p>
+    <div className="min-h-screen p-6 bg-gray-50">
+      <div className="max-w-2xl mx-auto bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+        <h1 className="text-2xl font-bold text-navy mb-2">Apply as Teacher</h1>
+        <p className="text-muted mb-6">Submit your request to become a teacher. Admin approval is required.</p>
 
         {error && (
-          <p style={{ color: '#b91c1c', fontWeight: 600, background: '#fff1f2', padding: '8px 10px', borderRadius: '8px' }}>
+          <p className="text-red-600 font-semibold bg-red-50 border border-red-100 rounded-lg p-3 mb-4">
             {error}
           </p>
         )}
 
         {submitted && (
-          <p style={{ color: '#166534', fontWeight: 600 }}>
+          <p className="text-green-600 font-semibold mb-4">
             Application submitted. Waiting for admin approval.
           </p>
         )}
@@ -150,28 +103,15 @@ function ApplyTeacher() {
           type="button"
           onClick={handleApplyAsTeacher}
           disabled={submitted || submitting}
-          style={{
-            padding: '10px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: submitted ? '#9ca3af' : '#667eea',
-            color: '#ffffff',
-            cursor: submitted ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
-          }}
+          className={`px-4 py-2.5 rounded-lg border-none font-semibold transition-all ${
+            submitted 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+          }`}
         >
           {submitting ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  border: '2px solid rgba(255, 255, 255, 0.5)',
-                  borderTopColor: '#ffffff',
-                  borderRadius: '999px',
-                  animation: 'applyTeacherSpin 0.8s linear infinite',
-                }}
-              />
+            <span className="inline-flex items-center gap-2">
+              <span className="w-3.5 h-3.5 border-2 border-white/50 border-t-white rounded-full animate-spin"></span>
               <span>Submitting...</span>
             </span>
           ) : (

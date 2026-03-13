@@ -7,6 +7,8 @@ import StudentDashboard from './pages/StudentDashboard'
 import OnlineTeachers from './pages/OnlineTeachers'
 import Textbook from './pages/Textbook'
 import BrowseLessons from './pages/BrowseLessons'
+import TeacherReservations from './pages/TeacherReservations'
+import BookLesson from './pages/BookLesson'
 import LessonDetails from './pages/LessonDetails'
 import LessonRoom from './pages/LessonRoom'
 import VideoLesson from './pages/VideoLesson'
@@ -14,7 +16,6 @@ import CreateLesson from './pages/CreateLesson'
 import ApplyTeacher from './pages/ApplyTeacher'
 import TeacherDashboard from './pages/TeacherDashboard'
 import TeacherSchedule from './pages/TeacherSchedule'
-import TeacherReservations from './pages/TeacherReservations'
 import TeacherLessons from './pages/TeacherLessons'
 import TeacherEarnings from './pages/TeacherEarnings'
 import TeacherProfile from './pages/TeacherProfile'
@@ -28,6 +29,10 @@ import StudentPreferences from './pages/StudentPreferences'
 import StudentAccount from './pages/StudentAccount'
 import StudentReservations from './pages/StudentReservations'
 import StudentReviews from './pages/StudentReviews'
+import Settings from './pages/Settings'
+import Messages from './pages/Messages'
+import MyLessons from './pages/MyLessons'
+import Textbooks from './pages/Textbooks'
 import RoleGuard from './components/RoleGuard'
 import ProtectedRoute from './components/ProtectedRoute'
 import TeacherLayout from './components/TeacherLayout'
@@ -44,6 +49,7 @@ function App() {
         <Route path="/student/login" element={<StudentLogin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/dashboard" element={<Navigate to="/student/dashboard" replace />} />
+        <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route
           path="/student"
           element={
@@ -67,8 +73,14 @@ function App() {
         <Route path="/textbook" element={<Textbook />} />
         <Route path="/browse-lessons" element={<Navigate to="/student/book-lesson" replace />} />
         <Route path="/lesson-details/:id" element={<LessonDetails />} />
+        <Route path="/lesson" element={<LessonRoom />} />
         <Route path="/lesson/:roomId" element={<LessonRoom />} />
         <Route path="/lesson-room/:reservationId" element={<LessonRoom />} />
+        <Route path="/settings" element={<Navigate to="/student/account" replace />} />
+        <Route path="/messages" element={<Navigate to="/student/messages" replace />} />
+        <Route path="/lessons" element={<Navigate to="/student/lessons" replace />} />
+        <Route path="/student/book-lesson" element={<BrowseLessons />} />
+        <Route path="/textbooks" element={<Navigate to="/student/book-lesson" replace />} />
         <Route
           path="/video-lesson/:lessonId"
           element={
@@ -107,6 +119,16 @@ function App() {
             </RoleGuard>
           }
         />
+        {/* Additional routes for landing page navigation */}
+        <Route path="/browse" element={<Navigate to="/student/book-lesson" replace />} />
+        <Route path="/book/:teacherId" element={<Navigate to="/student/book-lesson" replace />} />
+        <Route path="/how-it-works" element={<Navigate to="/" replace />} />
+        <Route path="/pricing" element={<Navigate to="/" replace />} />
+        <Route path="/about" element={<Navigate to="/" replace />} />
+        <Route path="/careers" element={<Navigate to="/" replace />} />
+        <Route path="/blog" element={<Navigate to="/" replace />} />
+        <Route path="/privacy" element={<Navigate to="/" replace />} />
+        <Route path="/terms" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

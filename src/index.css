@@ -1,67 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --app-bg: #f4f7fb;
-    --app-surface: #ffffffcc;
-    --app-border: #dbe6f5;
-    --app-text: #0f172a;
-    --app-muted: #5b6475;
-    --brand-1: #0ea5e9;
-    --brand-2: #22d3ee;
-    --glass-blur: 18px;
-  }
-
-  .dark {
-    --app-bg: #0f172a;
-    --app-surface: #1e293bcc;
-    --app-border: #334155;
-    --app-text: #f1f5f9;
-    --app-muted: #94a3b8;
-    --brand-1: #0ea5e9;
-    --brand-2: #22d3ee;
-    --glass-blur: 18px;
-  }
-
-  html,
-  body,
-  #root {
-    height: 100%;
-  }
-
-  body {
-    @apply m-0 bg-[var(--app-bg)] text-[var(--app-text)] antialiased font-sans;
-    background-image:
-      radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.14), transparent 35%),
-      radial-gradient(circle at 100% 20%, rgba(34, 211, 238, 0.12), transparent 32%);
-    background-attachment: fixed;
-    transition: background 0.4s;
-  }
-
-  * {
-    @apply box-border;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5 {
-    @apply font-display;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@layer utilities {
-  .glass {
-    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-radius: 1.25rem;
-    border: 1px solid var(--app-border);
-  }
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Syne', sans-serif;
+}
+
+a { text-decoration: none; }
+button { cursor: pointer; border: none; outline: none; }
+input, textarea { outline: none; font-family: inherit; }
+
+.btn-primary {
+  background: #0EA5A0;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  background: #0C8F8A;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14,165,160,0.3);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #0F172A;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1.5px solid #E2E8F0;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  border-color: #0EA5A0;
+  color: #0EA5A0;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
