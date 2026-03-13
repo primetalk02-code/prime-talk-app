@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/authContext.jsx'
+import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabaseClient'
+import { acceptLesson } from '../api/lessons/acceptLesson'
+import { startTeacherPresence, stopTeacherPresence } from '../lib/presence'
+import { createDailyToken } from '../lib/daily'
 import IncomingLessonAlert from '../components/IncomingLessonAlert'
 
 export default function TeacherDashboard() {
@@ -21,7 +24,10 @@ export default function TeacherDashboard() {
         .select('status')
         .eq('id', user.id)
         .maybeSingle()
-      setIsOnline(profile?.status === 'online')
+      const online = profile?.status === 'online'
+      setIsOnline(online)
+      // Resume heartbeat if was online
+      if (online) await startTeacherPresence(user.id)
     }
     loadStatus()
   }, [])
@@ -77,13 +83,19 @@ export default function TeacherDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const newStatus = isOnline ? 'offline' : 'online'
-    const { error } = await supabase
+    // Update profiles table
+    await supabase
       .from('profiles')
       .update({ status: newStatus })
       .eq('id', user.id)
-    if (!error) {
-      setIsOnline(!isOnline)
+    if (!isOnline) {
+      // Going online — start heartbeat
+      await startTeacherPresence(user.id)
+    } else {
+      // Going offline — stop heartbeat
+      await stopTeacherPresence(user.id)
     }
+    setIsOnline(!isOnline)
   }
 
   const teacherName = user?.user_metadata?.full_name || 'Teacher'
@@ -326,15 +338,32 @@ export default function TeacherDashboard() {
           duration={incomingLesson.duration}
           preference={incomingLesson.preference}
           onAccept={async () => {
-            // Update lesson status to active
-            await supabase
-              .from('lessons')
-              .update({ status: 'active' })
-              .eq('id', incomingLesson.id)
-            setShowIncoming(false)
-            setIncomingLesson(null)
-            // Navigate to lesson room
-            window.location.href = `/lesson/${incomingLesson.id}`
+            try {
+              const { data: { user } } = await supabase.auth.getUser()
+              // Generate teacher token
+              const roomName = `lesson-${incomingLesson.id}`
+              let teacherToken = null
+              try {
+                teacherToken = await createDailyToken(roomName, user.id, true)
+              } catch (e) {
+                console.warn('Teacher token failed:', e)
+              }
+              // Update lesson: active + teacher token
+              await supabase
+                .from('lessons')
+                .update({
+                  status: 'active',
+                  teacher_token: teacherToken,
+                  room_name: roomName,
+                })
+                .eq('id', incomingLesson.id)
+              setShowIncoming(false)
+              setIncomingLesson(null)
+              // Go to lesson room
+              window.location.href = `/lesson/${incomingLesson.id}`
+            } catch (e) {
+              console.error('Accept failed:', e)
+            }
           }}
         />
       )}

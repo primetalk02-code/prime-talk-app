@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  LESSON_ACTIVE_STATUS,
-  SUDDEN_LESSON_REQUEST_TIMEOUT_MS,
-  createPendingLessonRequest,
-  findAvailableSuddenLessonTeachers,
-  waitForLessonDecision,
-} from '../lib/lessonSessions'
+import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabaseClient'
+import { createSuddenLesson } from '../api/lessons/createSuddenLesson'
+import { getOnlineTeachers } from '../lib/presence'
+import { createDailyRoom, createDailyToken, getDailyRoomUrl } from '../lib/daily'
 import DurationSelector from '../components/DurationSelector'
 
 const DURATION_OPTIONS = [5, 10, 25]
@@ -131,6 +128,16 @@ function StudentOnlineTeachers() {
 
       setCurrentUser(user)
 
+      // Get online teachers using presence API
+      const teachersResult = await getOnlineTeachers()
+      if (teachersResult.success) {
+        setTeachers(teachersResult.teachers)
+      } else {
+        setError(teachersResult.error)
+        setTeachers([])
+      }
+
+      // Load preferences
       const primaryPreferencesResult = await supabase
         .from('student_preferences')
         .select('lesson_duration, textbook, preferred_lesson_time')
@@ -164,19 +171,13 @@ function StudentOnlineTeachers() {
       setTextbook(nextTextbook)
       setPreferredLessonMode(nextMode)
 
-      const preferredWindow =
-        nextMode === 'scheduled'
-          ? { day: getCurrentDay(), time: toTimeWithSeconds(getCurrentTime()) }
-          : { day: getCurrentDay(), time: toTimeWithSeconds(getCurrentTime()) }
-
-      await loadTeacherPool(preferredWindow)
     } catch (loadError) {
       setError(loadError.message)
       setTeachers([])
     } finally {
       setLoading(false)
     }
-  }, [loadTeacherPool, navigate])
+  }, [navigate])
 
   useEffect(() => {
     void loadOnlineTeachers()
@@ -232,8 +233,9 @@ function StudentOnlineTeachers() {
     if (!currentUser || isMatching) return
     setIsMatching(true)
     setError('')
-    setMatchMessage(`Sending request to ${teacher.full_name}...`)
+    setMatchMessage(`Connecting to ${teacher.full_name || 'teacher'}...`)
     try {
+      // 1. Create lesson record
       const { data: lesson, error: insertError } = await supabase
         .from('lessons')
         .insert({
@@ -247,22 +249,68 @@ function StudentOnlineTeachers() {
         .select('id')
         .single()
       if (insertError) throw insertError
-      setMatchMessage('Request sent! Waiting for teacher to accept...')
-      // Poll for acceptance for 30 seconds
+
+      // 2. Create Daily room
+      const roomName = `lesson-${lesson.id}`
+      let roomUrl = getDailyRoomUrl(roomName)
+      try {
+        const room = await createDailyRoom(lesson.id)
+        roomUrl = room.url || getDailyRoomUrl(roomName)
+      } catch (roomErr) {
+        console.warn('Room creation failed, using default URL:', roomErr)
+      }
+
+      // 3. Generate student token
+      let studentToken = null
+      try {
+        studentToken = await createDailyToken(roomName, currentUser.id, false)
+      } catch (tokenErr) {
+        console.warn('Token creation failed:', tokenErr)
+      }
+
+      // 4. Update lesson with room info
+      await supabase
+        .from('lessons')
+        .update({
+          room_name: roomName,
+          room_url: roomUrl,
+          student_token: studentToken,
+        })
+        .eq('id', lesson.id)
+
+      setMatchMessage('Waiting for teacher to accept...')
+
+      // 5. Poll for teacher acceptance (30 second timeout)
       let attempts = 0
+      const maxAttempts = 30
       const pollInterval = setInterval(async () => {
         attempts++
         const { data: lessonData } = await supabase
-          .from('lessons').select('status').eq('id', lesson.id).single()
+          .from('lessons')
+          .select('status, room_url, student_token')
+          .eq('id', lesson.id)
+          .single()
+
         if (lessonData?.status === 'active') {
           clearInterval(pollInterval)
+          // Go to lesson room
           window.location.href = `/lesson/${lesson.id}`
-        } else if (lessonData?.status === 'declined' || attempts > 30) {
+        } else if (lessonData?.status === 'declined' || attempts >= maxAttempts) {
           clearInterval(pollInterval)
-          setMatchMessage('Teacher did not respond. Try another teacher.')
+          // Auto-cancel if timeout
+          if (attempts >= maxAttempts) {
+            await supabase
+              .from('lessons')
+              .update({ status: 'declined' })
+              .eq('id', lesson.id)
+            setMatchMessage('Teacher did not respond. Please try another teacher.')
+          } else {
+            setMatchMessage('Teacher unavailable. Please try another.')
+          }
           setIsMatching(false)
         }
       }, 1000)
+
     } catch (e) {
       setError(e.message)
       setIsMatching(false)

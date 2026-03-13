@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/authContext'
 
 export default function LessonRoom() {
@@ -26,9 +27,13 @@ export default function LessonRoom() {
     {word:'Follow up', definition:'To contact someone again about something'},
     {word:'Regarding', definition:'Concerning or in relation to something'}
   ])
-  const videoRef = useRef(null)
+  const dailyContainerRef = useRef(null)
   const { role } = useAuth()
+  const [roomUrl, setRoomUrl] = useState('')
+  const [token, setToken] = useState('')
   const [lessonData, setLessonData] = useState(null)
+  const [lessonLoading, setLessonLoading] = useState(true)
+  const [lessonError, setLessonError] = useState('')
 
   // Timer
   useEffect(() => {
@@ -40,44 +45,70 @@ export default function LessonRoom() {
 
   useEffect(() => {
     if (!actualLessonId) return
-    const loadLesson = async () => {
-      const { data } = await supabase
-        .from('lessons')
-        .select('id, teacher_id, student_id, status, textbook, duration')
-        .eq('id', actualLessonId)
-        .single()
-      if (data) setLessonData(data)
-    }
-    loadLesson()
-  }, [actualLessonId])
-
-  const localVideoRef = useRef(null)
-  const [cameraActive, setCameraActive] = useState(false)
-  const [cameraError, setCameraError] = useState('')
-  const streamRef = useRef(null)
-
-  useEffect(() => {
-    const startCamera = async () => {
+    const initRoom = async () => {
+      setLessonLoading(true)
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, audio: true 
-        })
-        streamRef.current = stream
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream
+        const { data: { user } } = await supabase.auth.getUser()
+        const userRole = role || localStorage.getItem('userRole') || 'student'
+
+        // Load lesson from Supabase
+        const { data: lesson, error } = await supabase
+          .from('lessons')
+          .select('id, teacher_id, student_id, status, room_url, room_name, teacher_token, student_token, textbook, duration')
+          .eq('id', actualLessonId)
+          .single()
+        if (error) throw error
+        if (!lesson) throw new Error('Lesson not found')
+
+        const url = lesson.room_url || `https://${import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'}/lesson-${actualLessonId}`
+        const userToken = userRole === 'teacher' ? lesson.teacher_token : lesson.student_token
+
+        setRoomUrl(url)
+        setToken(userToken || '')
+        setLessonData(lesson)
+
+        // Inject Daily iframe
+        if (dailyContainerRef.current) {
+          dailyContainerRef.current.innerHTML = ''
+          const script = document.createElement('script')
+          script.src = 'https://unpkg.com/@daily-co/daily-js'
+          script.onload = () => {
+            const callFrame = window.DailyIframe.createFrame(
+              dailyContainerRef.current,
+              {
+                iframeStyle: {
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  borderRadius: '12px',
+                },
+                showLeaveButton: false,
+                showFullscreenButton: true,
+              }
+            )
+            const joinOptions = { url }
+            if (userToken) joinOptions.token = userToken
+            callFrame.join(joinOptions)
+            // Cleanup on unmount
+            callFrame._container = dailyContainerRef.current
+            window._dailyCallObject = callFrame
+          }
+          document.head.appendChild(script)
         }
-        setCameraActive(true)
       } catch (err) {
-        setCameraError('Camera access denied. Please allow camera permissions.')
+        setLessonError(err.message)
       }
+      setLessonLoading(false)
     }
-    startCamera()
+    initRoom()
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
+      if (window._dailyCallObject) {
+        window._dailyCallObject.leave().catch(() => {})
+        window._dailyCallObject.destroy().catch(() => {})
+        window._dailyCallObject = null
       }
     }
-  }, [])
+  }, [actualLessonId])
 
   const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
   const isLowTime = timeLeft < 300
@@ -156,42 +187,24 @@ export default function LessonRoom() {
                      borderRight:'1px solid #1E2535', position:'relative',
                      display:'flex', alignItems:'center', justifyContent:'center'}}>
           
-          {/* Remote student area - placeholder */}
-          <div style={{ width:'100%', height:'100%', display:'flex',
-                        alignItems:'center', justifyContent:'center',
-                        flexDirection:'column', background:'#0D1117', gap:'12px' }}>
-            <div style={{ fontSize:'80px' }}>👤</div>
-            <p style={{ color:'white', fontSize:'18px', fontWeight:700 }}>
-              {lessonData?.textbook || 'English Lesson'}
-            </p>
-            <p style={{ color:'#64748B', fontSize:'14px' }}>
-              {lessonData?.duration || 25} min · Waiting for other participant...
-            </p>
-          </div>
-
-          {/* Local camera preview - bottom right corner */}
-          <div style={{ position:'absolute', bottom:'16px', right:'16px',
-                        width:'160px', height:'120px', borderRadius:'8px',
-                        overflow:'hidden', border:'2px solid #0EA5A0',
-                        background:'#1a1a2e' }}>
-            {cameraError ? (
-              <div style={{ width:'100%', height:'100%', display:'flex',
-                            alignItems:'center', justifyContent:'center',
-                            flexDirection:'column', padding:'8px', textAlign:'center' }}>
-                <span style={{ fontSize:'24px' }}>🚫</span>
-                <p style={{ color:'#EF4444', fontSize:'10px', marginTop:'4px' }}>
-                  {cameraError}
-                </p>
+          {/* Daily Video Container */}
+          <div ref={dailyContainerRef}
+            style={{width:'100%', height:'100%', background:'#0D1117',
+                    borderRadius:'12px', overflow:'hidden', minHeight:'400px'}}>
+            {lessonLoading && (
+              <div style={{display:'flex', alignItems:'center', justifyContent:'center',
+                           height:'100%', color:'#64748B', flexDirection:'column', gap:'12px'}}>
+                <div style={{fontSize:'32px'}}>📡</div>
+                <p>Connecting to video room...</p>
               </div>
-            ) : (
-              <video ref={localVideoRef} autoPlay muted playsInline
-                style={{ width:'100%', height:'100%', objectFit:'cover', transform:'scaleX(-1)' }} />
             )}
-            <div style={{ position:'absolute', bottom:'4px', left:'4px',
-                          fontSize:'9px', color:'white', background:'rgba(0,0,0,0.5)',
-                          padding:'2px 6px', borderRadius:'4px' }}>
-              You
-            </div>
+            {lessonError && (
+              <div style={{display:'flex', alignItems:'center', justifyContent:'center',
+                           height:'100%', color:'#EF4444', flexDirection:'column', gap:'12px'}}>
+                <div style={{fontSize:'32px'}}>❌</div>
+                <p>{lessonError}</p>
+              </div>
+            )}
           </div>
         </div>
 
