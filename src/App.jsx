@@ -73,7 +73,9 @@ function App() {
         <Route path="/textbook" element={<Textbook />} />
         <Route path="/browse-lessons" element={<Navigate to="/student/book-lesson" replace />} />
         <Route path="/lesson-details/:id" element={<LessonDetails />} />
+        <Route path="/lesson" element={<LessonRoom />} />
         <Route path="/lesson/:lessonId" element={<LessonRoom />} />
+        <Route path="/lesson-room/:lessonId" element={<LessonRoom />} />
         <Route path="/settings" element={<Navigate to="/student/account" replace />} />
         <Route path="/messages" element={<Navigate to="/student/messages" replace />} />
         <Route path="/lessons" element={<Navigate to="/student/lessons" replace />} />
