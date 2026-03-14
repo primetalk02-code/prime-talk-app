@@ -49,9 +49,9 @@ export default function LessonRoom() {
         showFullscreenButton: true,
       })
       window._dailyCall = frame
-      frame.on('joined-meeting', () => { setStatus(''); setJoined(true) })
+      frame.on('joined-meeting', () => { window._hasJoined = true; setStatus(''); setJoined(true) })
       frame.on('error', (e) => setError('Video error: ' + (e && e.errorMsg ? e.errorMsg : 'unknown')))
-      frame.on('left-meeting', () => endLesson())
+      frame.on('left-meeting', () => { if (window._hasJoined) endLesson() })
       const opts = { url: roomUrl }
       if (token) opts.token = token
       frame.join(opts).catch((e) => setError('Could not join: ' + e.message))
@@ -166,5 +166,6 @@ export default function LessonRoom() {
     )
   )
 }
+
 
 
