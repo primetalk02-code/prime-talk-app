@@ -37,7 +37,7 @@ export default function LessonRoom() {
     const loadScript = () => {
       if (window.JitsiMeetExternalAPI) { initJitsi(roomName, displayName); return }
       const s = document.createElement('script')
-      s.src = 'https://8x8.vc/external_api.js'
+      s.src = 'https://meet.jit.si/external_api.js'
       s.async = true
       s.onload = () => { setJoined(true); initJitsi(roomName, displayName) }
       s.onerror = () => setError('Failed to load video. Check your connection.')
@@ -48,15 +48,15 @@ export default function LessonRoom() {
 
   const initJitsi = (roomName, displayName) => {
     try {
-      const api = new window.JitsiMeetExternalAPI('8x8.vc', {
-        roomName: 'vpaas-magic-cookie-free/primetalk-' + roomName,
+      const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+        roomName: 'primetalk-' + roomName,
         parentNode: containerRef.current,
         userInfo: { displayName: displayName || 'User' },
         configOverwrite: {
           startWithAudioMuted: false,
           startWithVideoMuted: false,
           disableDeepLinking: true,
-          prejoinPageEnabled: false,
+          prejoinPageEnabled: false, requireDisplayName: false, enableWelcomePage: false,
         },
         interfaceConfigOverwrite: {
           SHOW_JITSI_WATERMARK: false,
@@ -155,5 +155,6 @@ export default function LessonRoom() {
     )
   )
 }
+
 
 
