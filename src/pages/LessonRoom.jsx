@@ -90,7 +90,7 @@ export default function LessonRoom() {
       if (data.status === 'active') {
         clearInterval(pollRef.current)
         pollRef.current = null
-        const domain = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
+        const domain = (import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co').trim()
         const rn = data.room_name || ('lesson-' + id)
         const ru = data.room_url || ('https://' + domain + '/' + rn)
         connectVideo(ru, data.student_token)
@@ -119,7 +119,7 @@ export default function LessonRoom() {
         const { data: ld, error: fe } = await supabase.from('lessons').select('*').eq('id', lessonId).single()
         if (fe || !ld) { setError('Lesson not found. ID: ' + lessonId); return }
         setLesson(ld)
-        const domain = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
+        const domain = (import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co').trim()
         const rn = ld.room_name || ('lesson-' + lessonId)
         const ru = ld.room_url || ('https://' + domain + '/' + rn)
         if (teacher) {
@@ -166,4 +166,5 @@ export default function LessonRoom() {
     )
   )
 }
+
 
