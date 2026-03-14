@@ -100,7 +100,19 @@ export default function TeacherDashboard() {
     stopAlertSound()
     setShowIncoming(false)
     try {
-      await supabase.from('lessons').update({ status: 'active' }).eq('id', incomingLesson.id)
+      const roomName = incomingLesson.room_name
+      let teacherToken = null
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const resp = await fetch('https://api.daily.co/v1/meeting-tokens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_DAILY_API_KEY },
+          body: JSON.stringify({ properties: { room_name: roomName, is_owner: true, exp: Math.floor(Date.now()/1000) + 7200 } })
+        })
+        const d = await resp.json()
+        teacherToken = d.token
+      } catch (e) { console.warn('Token gen failed:', e) }
+      await supabase.from('lessons').update({ status: 'active', teacher_token: teacherToken }).eq('id', incomingLesson.id)
       window.location.href = '/lesson/' + incomingLesson.id
     } catch (e) {
       console.error('Accept failed:', e)
@@ -153,4 +165,5 @@ export default function TeacherDashboard() {
     )
   )
 }
+
 
