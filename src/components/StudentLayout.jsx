@@ -13,68 +13,37 @@ const studentMenuItems = [
   { label: 'Account', to: '/student/account', icon: '👤' },
 ]
 
+const SIDEBAR_W = 260
+const HEADER_H = 56
+
 function StudentLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [studentName, setStudentName] = useState('Student')
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
 
-  const todayLabel = useMemo(() => {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(new Date())
+  const todayLabel = useMemo(() =>
+    new Intl.DateTimeFormat('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+    }).format(new Date()), [])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   useEffect(() => {
-    let isMounted = true
-
-    const loadStudent = async () => {
-      try {
-        setError('')
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
-
-        if (userError) {
-          throw userError
-        }
-
-        if (!user) {
-          navigate('/login', { replace: true })
-          return
-        }
-
-        if (isMounted) {
-          setStudentName(
-            user.user_metadata?.full_name ||
-              user.email?.split('@')?.[0] ||
-              user.email ||
-              'Student',
-          )
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setError(loadError.message)
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadStudent()
-
-    return () => {
-      isMounted = false
-    }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { navigate('/login'); return }
+      setStudentName(
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'Student'
+      )
+    })
   }, [navigate])
 
   useEffect(() => {
@@ -83,157 +52,165 @@ function StudentLayout() {
   }, [location.pathname])
 
   const handleLogout = async () => {
-    try {
-      setError('')
-      const { error: signOutError } = await supabase.auth.signOut()
-
-      if (signOutError) {
-        throw signOutError
-      }
-
-      localStorage.clear()
-
-      navigate('/login', { replace: true })
-    } catch (signOutFailure) {
-      setError(signOutFailure.message)
-    }
+    await supabase.auth.signOut()
+    localStorage.clear()
+    navigate('/login')
   }
 
-  return (
-    <div className="min-h-screen">
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[270px] flex-col border-r border-slate-200/80 bg-white/95 shadow-soft backdrop-blur transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
-      >
-        <div className="flex h-16 items-center justify-between border-b border-slate-100 px-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">Prime Talk</p>
-            <p className="text-lg font-bold text-slate-900">Student</p>
-          </div>
+  const sidebarVisible = !isMobile || sidebarOpen
 
-          <button
-            type="button"
-            className="rounded-md p-1 text-slate-700 transition hover:bg-slate-100 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            <span className="h-5 w-5">❌</span>
-          </button>
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, sans-serif' }}>
+
+      {/* Sidebar overlay on mobile */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)',
+          zIndex: 30
+        }} />
+      )}
+
+      {/* Sidebar */}
+      <aside style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        width: `${SIDEBAR_W}px`,
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex', flexDirection: 'column',
+        zIndex: 40,
+        transform: sidebarVisible ? 'translateX(0)' : `translateX(-${SIDEBAR_W}px)`,
+        transition: 'transform 0.3s ease',
+        boxShadow: isMobile && sidebarOpen ? '4px 0 24px rgba(0,0,0,0.1)' : 'none',
+      }}>
+        {/* Logo */}
+        <div style={{
+          height: `${HEADER_H}px`, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 20px',
+          borderBottom: '1px solid #E2E8F0'
+        }}>
+          <div>
+            <p style={{ fontSize: '10px', fontWeight: 700, color: '#0EA5A0',
+              textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>Prime Talk</p>
+            <p style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Student</p>
+          </div>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)} style={{
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px'
+            }}>✕</button>
+          )}
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {studentMenuItems.map((item) => {
-            const Icon = item.icon
-
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    isActive
-                      ? 'bg-sky-50 text-sky-700'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`
-                }
-              >
-                <span className="h-5 w-5">{Icon}</span>
-                <span>{item.label}</span>
-              </NavLink>
-            )
-          })}
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
+          {studentMenuItems.map(item => (
+            <NavLink key={item.to} to={item.to} style={({ isActive }) => ({
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '10px 12px', borderRadius: '10px',
+              textDecoration: 'none', fontSize: '14px', fontWeight: 500,
+              marginBottom: '2px',
+              background: isActive ? '#F0FDFC' : 'transparent',
+              color: isActive ? '#0EA5A0' : '#475569',
+              transition: 'all 0.15s',
+            })}>
+              <span style={{ fontSize: '16px' }}>{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
-        <div className="border-t border-slate-100 p-3">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
-          >
-            <span className="h-5 w-5">🚪</span>
-            <span>Logout</span>
+        {/* Logout */}
+        <div style={{ padding: '12px', borderTop: '1px solid #E2E8F0' }}>
+          <button onClick={handleLogout} style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            width: '100%', padding: '10px 12px', borderRadius: '10px',
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '14px', fontWeight: 600, color: '#EF4444',
+          }}>
+            <span>🚪</span><span>Logout</span>
           </button>
         </div>
       </aside>
 
-      {sidebarOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-label="Close menu overlay"
-        />
-      )}
-
-      <div className="flex min-h-screen flex-col lg:pl-[270px]">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur sm:px-6">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="rounded-lg border border-slate-200 p-1.5 text-slate-700 transition hover:bg-slate-100 lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open sidebar"
-            >
-              <span className="h-5 w-5">☰</span>
-            </button>
-
+      {/* Main area */}
+      <div style={{
+        marginLeft: isMobile ? 0 : `${SIDEBAR_W}px`,
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        transition: 'margin-left 0.3s ease',
+      }}>
+        {/* Header */}
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 20,
+          height: `${HEADER_H}px`,
+          background: 'rgba(255,255,255,0.95)',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 16px',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {isMobile && (
+              <button onClick={() => setSidebarOpen(true)} style={{
+                background: 'none', border: '1px solid #E2E8F0',
+                borderRadius: '8px', padding: '6px 10px',
+                cursor: 'pointer', fontSize: '16px', color: '#475569'
+              }}>☰</button>
+            )}
             <div>
-              <p className="text-sm font-semibold text-slate-900">Student Workspace</p>
-              <p className="text-xs text-slate-500">{todayLabel}</p>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                Student Workspace
+              </p>
+              <p style={{ margin: 0, fontSize: '11px', color: '#64748B' }}>{todayLabel}</p>
             </div>
           </div>
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setProfileOpen((prev) => !prev)}
-              className="flex items-center gap-2 rounded-xl border border-sky-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-sky-50"
-            >
-              {loading ? (
-                <>
-                  <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                  <span>Loading...</span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
-                    {(studentName || 'S').charAt(0).toUpperCase()}
-                  </span>
-                  <span className="max-w-[120px] truncate">{studentName}</span>
-                </>
-              )}
-              <span className="h-4 w-4">▼</span>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setProfileOpen(p => !p)} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              background: 'none', border: '1px solid #E2E8F0',
+              borderRadius: '10px', padding: '6px 10px',
+              cursor: 'pointer', fontSize: '13px', color: '#0F172A',
+            }}>
+              <span style={{
+                width: '26px', height: '26px', borderRadius: '50%',
+                background: '#F0FDFC', color: '#0EA5A0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: '12px'
+              }}>
+                {studentName.charAt(0).toUpperCase()}
+              </span>
+              <span style={{ maxWidth: '100px', overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {studentName}
+              </span>
+              <span style={{ fontSize: '10px' }}>▼</span>
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-card">
-                <button
-                  type="button"
-                  onClick={() => navigate('/student/account')}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100"
-                >
-                  Account
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
-                >
-                  Logout
-                </button>
+              <div style={{
+                position: 'absolute', right: 0, top: '44px',
+                background: '#FFFFFF', border: '1px solid #E2E8F0',
+                borderRadius: '12px', padding: '6px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.1)', minWidth: '160px', zIndex: 50
+              }}>
+                <button onClick={() => navigate('/student/account')} style={{
+                  display: 'block', width: '100%', padding: '8px 12px',
+                  textAlign: 'left', background: 'none', border: 'none',
+                  cursor: 'pointer', fontSize: '13px', color: '#0F172A',
+                  borderRadius: '8px',
+                }}>Account</button>
+                <button onClick={handleLogout} style={{
+                  display: 'block', width: '100%', padding: '8px 12px',
+                  textAlign: 'left', background: 'none', border: 'none',
+                  cursor: 'pointer', fontSize: '13px', color: '#EF4444',
+                  borderRadius: '8px',
+                }}>Logout</button>
               </div>
             )}
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {error && (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </div>
-          )}
-
+        {/* Page content */}
+        <main style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
           <Outlet />
         </main>
       </div>

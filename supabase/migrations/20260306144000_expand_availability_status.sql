@@ -1,3 +1,4 @@
+
 alter table if exists public.availability
   drop constraint if exists availability_status_check;
 
