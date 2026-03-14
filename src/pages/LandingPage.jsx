@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const LandingPage = () => {
+  const isMobile = window.innerWidth < 768
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [visibleSections, setVisibleSections] = useState(new Set())
   const [statsVisible, setStatsVisible] = useState(false)
@@ -176,7 +177,7 @@ const LandingPage = () => {
         </div>
 
         {/* Desktop Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', gap: 24 }}>
           <Link to="/" style={{
             color: '#334155', fontSize: 15, fontWeight: 500,
             padding: '8px 16px', borderRadius: 8, cursor: 'pointer'
@@ -269,7 +270,7 @@ const LandingPage = () => {
           borderRadius: '50%', filter: 'blur(40px)', zIndex: 0
         }}></div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 48, zIndex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 48, zIndex: 1, flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             {/* Badge */}
             <div style={{
@@ -282,14 +283,14 @@ const LandingPage = () => {
 
             {/* Headline */}
             <div>
-              <h1 style={{
-                fontSize: 64, fontWeight: 800, color: 'white', lineHeight: 1.1,
+            <h1 style={{
+                fontSize: isMobile ? 32 : 64, fontWeight: 800, color: 'white', lineHeight: 1.1,
                 marginBottom: 12
               }}>
                 Learn English with Expert Tutors
               </h1>
               <h1 style={{
-                fontSize: 64, fontWeight: 800, color: '#0EA5A0', lineHeight: 1.1
+                fontSize: isMobile ? 32 : 64, fontWeight: 800, color: '#0EA5A0', lineHeight: 1.1
               }}>
                 Anytime, Instantly.
               </h1>

@@ -7,6 +7,8 @@ import { getOnlineTeachers } from '../lib/presence'
 import { createDailyRoom, createDailyToken, getDailyRoomUrl } from '../lib/daily'
 import DurationSelector from '../components/DurationSelector'
 
+const SUDDEN_LESSON_REQUEST_TIMEOUT_MS = 30000
+
 const DURATION_OPTIONS = [5, 10, 25]
 const TEXTBOOK_OPTIONS = [
   'Daily Conversation',

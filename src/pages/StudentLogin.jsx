@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
 function StudentLogin() {
+  const isMobile = window.innerWidth < 768
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -77,13 +78,13 @@ function StudentLogin() {
 
   const leftStyle = {
     width: '55%', background: 'linear-gradient(135deg, #0F172A 0%, #0EA5A0 100%)',
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    display: isMobile ? 'none' : 'flex', flexDirection: 'column', justifyContent: 'space-between',
     padding: '48px'
   }
 
   const rightStyle = {
     flex: 1, background: 'white', display: 'flex', 
-    alignItems: 'center', justifyContent: 'center', padding: '48px'
+    alignItems: 'center', justifyContent: 'center', padding: isMobile ? '32px 20px' : '48px'
   }
 
   return (
