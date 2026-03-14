@@ -39,7 +39,7 @@ export default function LessonRoom() {
       const s = document.createElement('script')
       s.src = 'https://meet.jit.si/external_api.js'
       s.async = true
-      s.onload = () => initJitsi(roomName, displayName)
+      s.onload = () => { setJoined(true); initJitsi(roomName, displayName) }
       s.onerror = () => setError('Failed to load video. Check your connection.')
       document.head.appendChild(s)
     }
@@ -155,3 +155,4 @@ export default function LessonRoom() {
     )
   )
 }
+
