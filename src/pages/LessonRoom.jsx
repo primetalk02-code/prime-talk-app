@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-
+ 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
+ 
 function stopGlobalAudio() {
   if (window._lessonAudio) {
     window._lessonAudio.pause()
@@ -11,7 +11,7 @@ function stopGlobalAudio() {
     window._lessonAudio = null
   }
 }
-
+ 
 async function destroyDailyCall() {
   if (window._dailyCall) {
     try { await window._dailyCall.leave() } catch (_) {}
@@ -19,7 +19,7 @@ async function destroyDailyCall() {
     window._dailyCall = null
   }
 }
-
+ 
 function loadDailyScript(onReady) {
   if (window.DailyIframe) { onReady(); return }
   const existing = document.querySelector('script[src*="daily-js"]')
@@ -31,36 +31,36 @@ function loadDailyScript(onReady) {
   s.onerror = () => { throw new Error('Failed to load Daily.co video library') }
   document.head.appendChild(s)
 }
-
+ 
 // ─── component ────────────────────────────────────────────────────────────────
-
+ 
 export default function LessonRoom() {
   // App.jsx uses /lesson/:roomId  ← the param is called roomId, not lessonId
   const { roomId } = useParams()
   const navigate = useNavigate()
   const containerRef = useRef(null)
   const pollRef = useRef(null)
-
+ 
   const [lesson, setLesson] = useState(null)
   const [isTeacher, setIsTeacher] = useState(false)
   const [status, setStatus] = useState('Loading lesson…')
   const [error, setError] = useState('')
   const [joined, setJoined] = useState(false)
-
+ 
   // Derive the actual lesson UUID from the URL
   // Route is /lesson/:roomId — roomId IS the lesson id
   const lessonId = roomId
-
+ 
   // ── join Daily room ──────────────────────────────────────────────────────────
   const joinRoom = useCallback((roomUrl, token) => {
     if (!containerRef.current) {
       setError('Video container not ready. Please refresh.')
       return
     }
-
+ 
     // Kill any existing call first
     destroyDailyCall()
-
+ 
     try {
       const callFrame = window.DailyIframe.createFrame(containerRef.current, {
         iframeStyle: {
@@ -72,25 +72,25 @@ export default function LessonRoom() {
         showLeaveButton: false,
         showFullscreenButton: true,
       })
-
+ 
       window._dailyCall = callFrame
-
+ 
       callFrame.on('joined-meeting', () => {
         setStatus('')
         setJoined(true)
       })
-
+ 
       callFrame.on('error', (e) => {
         setError('Video error: ' + (e?.errorMsg || JSON.stringify(e) || 'Unknown'))
       })
-
+ 
       callFrame.on('left-meeting', () => {
         handleEndLesson()
       })
-
+ 
       const joinOpts = { url: roomUrl }
       if (token) joinOpts.token = token
-
+ 
       callFrame.join(joinOpts).catch((err) => {
         setError('Could not join video room: ' + err.message)
       })
@@ -98,11 +98,11 @@ export default function LessonRoom() {
       setError('Video setup error: ' + e.message)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
+ 
   // ── load Daily.js then join ──────────────────────────────────────────────────
   const connectVideo = useCallback((roomUrl, token) => {
     setStatus('Connecting to video…')
-
+ 
     const tryMount = (attempts = 0) => {
       if (!containerRef.current) {
         if (attempts < 15) { setTimeout(() => tryMount(attempts + 1), 300) }
@@ -111,35 +111,35 @@ export default function LessonRoom() {
       }
       joinRoom(roomUrl, token)
     }
-
+ 
     loadDailyScript(() => tryMount())
   }, [joinRoom])
-
+ 
   // ── poll Supabase until lesson becomes active ───────────────────────────────
   const pollForActive = useCallback((currentLessonId) => {
     if (pollRef.current) clearInterval(pollRef.current)
-
+ 
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('lessons')
         .select('status, room_url, room_name, student_token, teacher_token')
         .eq('id', currentLessonId)
         .single()
-
+ 
       if (!data) return
-
+ 
       if (data.status === 'active') {
         clearInterval(pollRef.current)
         pollRef.current = null
-
+ 
         const domain = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
         const roomName = data.room_name || `lesson-${currentLessonId}`
         const roomUrl  = data.room_url  || `https://${domain}/${roomName}`
         const token    = data.student_token
-
+ 
         setLesson(prev => ({ ...prev, ...data }))
         connectVideo(roomUrl, token)
-
+ 
       } else if (data.status === 'declined') {
         clearInterval(pollRef.current)
         pollRef.current = null
@@ -147,7 +147,7 @@ export default function LessonRoom() {
       }
     }, 2000)
   }, [connectVideo])
-
+ 
   // ── end lesson ───────────────────────────────────────────────────────────────
   const handleEndLesson = useCallback(async () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -157,43 +157,43 @@ export default function LessonRoom() {
     } catch (_) {}
     navigate(isTeacher ? '/teacher/dashboard' : '/student/dashboard')
   }, [lessonId, isTeacher, navigate])
-
+ 
   // ── init ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!lessonId || lessonId === 'undefined') {
       setError('No lesson ID found. Please go back and try again.')
       return
     }
-
+ 
     stopGlobalAudio()
-
+ 
     const init = async () => {
       try {
         // 1. Auth check
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { navigate('/student/login'); return }
-
+ 
         // 2. Role check
         const { data: profile } = await supabase
           .from('profiles').select('role').eq('id', user.id).single()
         const teacher = profile?.role === 'teacher'
         setIsTeacher(teacher)
-
+ 
         // 3. Load lesson
         const { data: lessonData, error: fetchErr } = await supabase
           .from('lessons').select('*').eq('id', lessonId).single()
-
+ 
         if (fetchErr || !lessonData) {
           setError('Lesson not found. (ID: ' + lessonId + ')')
           return
         }
         setLesson(lessonData)
-
+ 
         // 4. Decide what to do based on role + lesson status
         const domain   = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
         const roomName = lessonData.room_name || `lesson-${lessonId}`
         const roomUrl  = lessonData.room_url  || `https://${domain}/${roomName}`
-
+ 
         if (teacher) {
           // Teacher: always connect immediately with teacher_token
           const token = lessonData.teacher_token
@@ -211,16 +211,16 @@ export default function LessonRoom() {
         setError('Error loading lesson: ' + e.message)
       }
     }
-
+ 
     init()
-
+ 
     return () => {
       stopGlobalAudio()
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       destroyDailyCall()
     }
   }, [lessonId]) // eslint-disable-line react-hooks/exhaustive-deps
-
+ 
   // ─── render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{
@@ -242,7 +242,7 @@ export default function LessonRoom() {
         <span style={{ color: '#0EA5A0', fontWeight: 700, fontSize: '16px' }}>
           🎓 Prime Talk
         </span>
-
+ 
         {lesson && (
           <span style={{ color: '#94A3B8', fontSize: '12px' }}>
             {lesson.duration ? `${lesson.duration} min` : ''}
@@ -250,7 +250,7 @@ export default function LessonRoom() {
             {lesson.textbook || ''}
           </span>
         )}
-
+ 
         <button
           onClick={handleEndLesson}
           style={{
@@ -262,10 +262,10 @@ export default function LessonRoom() {
           End Lesson
         </button>
       </div>
-
+ 
       {/* ── Video area ── */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0D1117' }}>
-
+ 
         {/* Status / error overlay — hidden once joined */}
         {!joined && (status || error) && (
           <div style={{
@@ -323,7 +323,7 @@ export default function LessonRoom() {
             )}
           </div>
         )}
-
+ 
         {/* Daily.co iframe mounts here */}
         <div
           ref={containerRef}
@@ -337,3 +337,4 @@ export default function LessonRoom() {
     </div>
   )
 }
+ 
