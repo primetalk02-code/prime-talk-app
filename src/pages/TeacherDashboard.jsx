@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useRef } from 'react'
+﻿import React from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabaseClient'
@@ -152,3 +153,4 @@ export default function TeacherDashboard() {
     )
   )
 }
+
