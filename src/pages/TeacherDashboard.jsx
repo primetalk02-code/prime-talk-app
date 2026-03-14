@@ -26,10 +26,28 @@ export default function TeacherDashboard() {
         .maybeSingle()
       const online = profile?.status === 'online'
       setIsOnline(online)
-      // Resume heartbeat if was online
-      if (online) await startTeacherPresence(user.id)
+      if (online) {
+        // Resume heartbeat - keep teacher online after reload
+        const heartbeat = setInterval(async () => {
+          await supabase
+            .from('teacher_availability')
+            .upsert({ teacher_id: user.id, updated_at: new Date().toISOString() },
+              { onConflict: 'teacher_id' })
+        }, 10000)
+        window._teacherHeartbeat = heartbeat
+        // Immediate update
+        await supabase
+          .from('teacher_availability')
+          .upsert({ teacher_id: user.id, updated_at: new Date().toISOString() },
+            { onConflict: 'teacher_id' })
+      }
     }
     loadStatus()
+    return () => {
+      if (window._teacherHeartbeat) {
+        clearInterval(window._teacherHeartbeat)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -70,8 +88,12 @@ export default function TeacherDashboard() {
           // Play sound
           try {
             const audio = new Audio('/sounds/incoming.wav')
-            audio.play().catch(() => {})
-          } catch {}
+            audio.play().catch(() => {
+              // Fallback: try lesson-alert.wav
+              const audio2 = new Audio('/sounds/lesson-alert.wav')
+              audio2.play().catch(() => {})
+            })
+          } catch (e) {}
         })
         .subscribe()
     }
@@ -79,21 +101,81 @@ export default function TeacherDashboard() {
     return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
+  useEffect(() => {
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Subscribe to new lessons where this teacher is assigned
+      const channel = supabase
+        .channel('incoming-lessons')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'lessons',
+          filter: `teacher_id=eq.${user.id}`,
+        }, (payload) => {
+          const newLesson = payload.new
+          if (newLesson.status === 'waiting') {
+            setIncomingLesson(newLesson)
+            setShowIncoming(true)
+            // Play sound
+            try {
+              const audio = new Audio('/sounds/incoming.wav')
+              audio.play().catch(() => {
+                // Fallback: try lesson-alert.wav
+                const audio2 = new Audio('/sounds/lesson-alert.wav')
+                audio2.play().catch(() => {})
+              })
+            } catch (e) {}
+          }
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+
+    const cleanup = setupRealtimeSubscription()
+    return () => {
+      cleanup.then(fn => fn && fn())
+    }
+  }, [])
+
   const handleToggleOnline = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const newStatus = isOnline ? 'offline' : 'online'
-    // Update profiles table
+
     await supabase
       .from('profiles')
       .update({ status: newStatus })
       .eq('id', user.id)
+
     if (!isOnline) {
-      // Going online — start heartbeat
-      await startTeacherPresence(user.id)
+      // Going online - start heartbeat
+      await supabase
+        .from('teacher_availability')
+        .upsert({ teacher_id: user.id, updated_at: new Date().toISOString() },
+          { onConflict: 'teacher_id' })
+      const heartbeat = setInterval(async () => {
+        await supabase
+          .from('teacher_availability')
+          .upsert({ teacher_id: user.id, updated_at: new Date().toISOString() },
+            { onConflict: 'teacher_id' })
+      }, 10000)
+      window._teacherHeartbeat = heartbeat
     } else {
-      // Going offline — stop heartbeat
-      await stopTeacherPresence(user.id)
+      // Going offline - stop heartbeat
+      if (window._teacherHeartbeat) {
+        clearInterval(window._teacherHeartbeat)
+        window._teacherHeartbeat = null
+      }
+      await supabase
+        .from('teacher_availability')
+        .delete()
+        .eq('teacher_id', user.id)
     }
     setIsOnline(!isOnline)
   }
@@ -333,22 +415,36 @@ export default function TeacherDashboard() {
 
       {showIncoming && incomingLesson && (
         <IncomingLessonAlert
-          studentName={incomingLesson.studentName}
-          subject={incomingLesson.subject}
-          duration={incomingLesson.duration}
-          preference={incomingLesson.preference}
+          lesson={incomingLesson}
           onAccept={async () => {
             try {
               const { data: { user } } = await supabase.auth.getUser()
-              // Generate teacher token
-              const roomName = `lesson-${incomingLesson.id}`
+              const DAILY_API_KEY = import.meta.env.VITE_DAILY_API_KEY
+              const roomName = incomingLesson.room_name || `lesson-${incomingLesson.id}`
+
               let teacherToken = null
               try {
-                teacherToken = await createDailyToken(roomName, user.id, true)
+                const res = await fetch('https://api.daily.co/v1/meeting-tokens', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${DAILY_API_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    properties: {
+                      room_name: roomName,
+                      user_id: user.id,
+                      is_owner: true,
+                      exp: Math.floor(Date.now() / 1000) + 7200,
+                    },
+                  }),
+                })
+                const d = await res.json()
+                teacherToken = d.token
               } catch (e) {
                 console.warn('Teacher token failed:', e)
               }
-              // Update lesson: active + teacher token
+
               await supabase
                 .from('lessons')
                 .update({
@@ -357,9 +453,9 @@ export default function TeacherDashboard() {
                   room_name: roomName,
                 })
                 .eq('id', incomingLesson.id)
+
               setShowIncoming(false)
               setIncomingLesson(null)
-              // Go to lesson room
               window.location.href = `/lesson/${incomingLesson.id}`
             } catch (e) {
               console.error('Accept failed:', e)
