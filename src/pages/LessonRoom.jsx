@@ -1,371 +1,226 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../lib/authContext'
 
 export default function LessonRoom() {
+  const { lessonId } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
-  const { lessonId, roomId, reservationId } = useParams()
-  const actualLessonId = lessonId || roomId || reservationId
-  const teacherName = location.state?.teacherName || 'Sarah Kim'
-  
-  const [page, setPage] = useState(1)
-  const [activeTab, setActiveTab] = useState('Chat')
-  const [chatInput, setChatInput] = useState('')
-  const [notes, setNotes] = useState('')
-  const [newWord, setNewWord] = useState('')
-  const [isMuted, setIsMuted] = useState(false)
-  const [cameraOn, setCameraOn] = useState(true)
-  const [timeLeft, setTimeLeft] = useState(25 * 60)
-  const [messages, setMessages] = useState([
-    {sender:'teacher', text:'Hello! Ready to start our lesson?', time:'3:00 PM'},
-    {sender:'me', text:"Yes! Let's go!", time:'3:01 PM'},
-    {sender:'teacher', text:'Great! Open the textbook to Chapter 3.', time:'3:01 PM'}
-  ])
-  const [vocabList, setVocabList] = useState([
-    {word:'Follow up', definition:'To contact someone again about something'},
-    {word:'Regarding', definition:'Concerning or in relation to something'}
-  ])
-  const dailyContainerRef = useRef(null)
-  const { role } = useAuth()
-  const [roomUrl, setRoomUrl] = useState('')
-  const [token, setToken] = useState('')
-  const [lessonData, setLessonData] = useState(null)
-  const [lessonLoading, setLessonLoading] = useState(true)
-  const [lessonError, setLessonError] = useState('')
-
-  // Timer
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft(t => t <= 0 ? 0 : t - 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
+  const containerRef = useRef(null)
+  const [status, setStatus] = useState('Loading lesson...')
+  const [error, setError] = useState('')
+  const [lesson, setLesson] = useState(null)
+  const [isTeacher, setIsTeacher] = useState(false)
 
   useEffect(() => {
-    if (!actualLessonId) return
-    const initRoom = async () => {
-      setLessonLoading(true)
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        const userRole = role || localStorage.getItem('userRole') || 'student'
-
-        // Load lesson from Supabase
-        const { data: lesson, error } = await supabase
-          .from('lessons')
-          .select('id, teacher_id, student_id, status, room_url, room_name, teacher_token, student_token, textbook, duration')
-          .eq('id', actualLessonId)
-          .single()
-        if (error) throw error
-        if (!lesson) throw new Error('Lesson not found')
-
-        const url = lesson.room_url || `https://${import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'}/lesson-${actualLessonId}`
-        const userToken = userRole === 'teacher' ? lesson.teacher_token : lesson.student_token
-
-        setRoomUrl(url)
-        setToken(userToken || '')
-        setLessonData(lesson)
-
-        // Inject Daily iframe
-        if (dailyContainerRef.current) {
-          dailyContainerRef.current.innerHTML = ''
-          const script = document.createElement('script')
-          script.src = 'https://unpkg.com/@daily-co/daily-js'
-          script.onload = () => {
-            const callFrame = window.DailyIframe.createFrame(
-              dailyContainerRef.current,
-              {
-                iframeStyle: {
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  borderRadius: '12px',
-                },
-                showLeaveButton: false,
-                showFullscreenButton: true,
-              }
-            )
-            const joinOptions = { url }
-            if (userToken) joinOptions.token = userToken
-            callFrame.join(joinOptions)
-            // Cleanup on unmount
-            callFrame._container = dailyContainerRef.current
-            window._dailyCallObject = callFrame
-          }
-          document.head.appendChild(script)
-        }
-      } catch (err) {
-        setLessonError(err.message)
-      }
-      setLessonLoading(false)
-    }
-    initRoom()
+    if (!lessonId) { setError('No lesson ID'); return }
+    initLesson()
     return () => {
-      if (window._dailyCallObject) {
-        window._dailyCallObject.leave().catch(() => {})
-        window._dailyCallObject.destroy().catch(() => {})
-        window._dailyCallObject = null
+      if (window._dailyCall) {
+        window._dailyCall.leave().catch(() => {})
+        window._dailyCall.destroy().catch(() => {})
+        window._dailyCall = null
       }
     }
-  }, [actualLessonId])
+  }, [lessonId])
 
-  const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
-  const isLowTime = timeLeft < 300
+  // Student polls for lesson to become active
+  useEffect(() => {
+    if (!lesson || isTeacher) return
+    if (lesson.status === 'active') return
 
-  const sendMessage = () => {
-    if (!chatInput.trim()) return
-    setMessages(p => [...p, {sender:'me', text:chatInput,
-      time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}])
-    setChatInput('')
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('lessons')
+        .select('status, teacher_token, room_url, room_name')
+        .eq('id', lessonId)
+        .single()
+
+      if (data?.status === 'active') {
+        clearInterval(poll)
+        setLesson(prev => ({ ...prev, ...data }))
+        const domain = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
+        const roomName = data.room_name || `lesson-${lessonId}`
+        const roomUrl = data.room_url || `https://${domain}/${roomName}`
+        joinRoom(roomUrl, lesson?.student_token)
+      } else if (data?.status === 'declined') {
+        clearInterval(poll)
+        setError('Teacher declined. Please try another teacher.')
+      }
+    }, 2000)
+
+    return () => clearInterval(poll)
+  }, [lesson, isTeacher, lessonId])
+
+  const initLesson = async () => {
+    try {
+      setStatus('Loading lesson...')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { navigate('/student/login'); return }
+
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('id', user.id).single()
+      const teacher = profile?.role === 'teacher'
+      setIsTeacher(teacher)
+
+      const { data: lessonData, error: lessonError } = await supabase
+        .from('lessons').select('*').eq('id', lessonId).single()
+
+      if (lessonError || !lessonData) {
+        setError('Lesson not found')
+        return
+      }
+
+      setLesson(lessonData)
+
+      const domain = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
+      const roomName = lessonData.room_name || `lesson-${lessonId}`
+      const roomUrl = lessonData.room_url || `https://${domain}/${roomName}`
+      const token = teacher ? lessonData.teacher_token : lessonData.student_token
+
+      if (teacher && lessonData.status === 'active') {
+        // Teacher joins immediately
+        setStatus('Joining video room...')
+        loadDailyAndJoin(roomUrl, token)
+      } else if (!teacher) {
+        if (lessonData.status === 'active') {
+          // Student joins if already active
+          setStatus('Joining video room...')
+          loadDailyAndJoin(roomUrl, token)
+        } else {
+          // Student waits for teacher to accept
+          setStatus('⏳ Waiting for teacher to accept...')
+        }
+      } else {
+        setStatus('Preparing lesson room...')
+        loadDailyAndJoin(roomUrl, token)
+      }
+    } catch (e) {
+      setError('Error: ' + e.message)
+    }
   }
 
-  const addVocab = () => {
-    if (!newWord.trim()) return
-    setVocabList(p => [...p, {word:newWord, definition:'(definition pending)'}])
-    setNewWord('')
+  const loadDailyAndJoin = (roomUrl, token) => {
+    if (window.DailyIframe) {
+      joinRoom(roomUrl, token)
+    } else {
+      const script = document.createElement('script')
+      script.src = 'https://unpkg.com/@daily-co/daily-js'
+      script.onload = () => joinRoom(roomUrl, token)
+      script.onerror = () => setError('Failed to load video library')
+      document.head.appendChild(script)
+    }
+  }
+
+  const joinRoom = (roomUrl, token) => {
+    try {
+      if (!containerRef.current) { setError('Video container not ready'); return }
+      if (window._dailyCall) {
+        window._dailyCall.leave().catch(() => {})
+        window._dailyCall.destroy().catch(() => {})
+        window._dailyCall = null
+      }
+      setStatus('Connecting to video...')
+      const callFrame = window.DailyIframe.createFrame(containerRef.current, {
+        iframeStyle: { width: '100%', height: '100%', border: 'none' },
+        showLeaveButton: false,
+        showFullscreenButton: true,
+      })
+      window._dailyCall = callFrame
+      const joinOptions = { url: roomUrl }
+      if (token) joinOptions.token = token
+      callFrame.join(joinOptions)
+        .then(() => setStatus(''))
+        .catch(err => setError('Failed to join: ' + err.message))
+    } catch (e) {
+      setError('Video error: ' + e.message)
+    }
+  }
+
+  const handleEndLesson = async () => {
+    if (window._dailyCall) {
+      await window._dailyCall.leave().catch(() => {})
+      await window._dailyCall.destroy().catch(() => {})
+      window._dailyCall = null
+    }
+    await supabase.from('lessons')
+      .update({ status: 'finished' }).eq('id', lessonId)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single()
+    navigate(profile?.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard')
   }
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100vh',
-                 background:'#0D1117', color:'white', overflow:'hidden'}}>
-      
-      {/* HEADER */}
-      <header style={{height:'56px', background:'#161C27',
-                      borderBottom:'1px solid #1E2535', flexShrink:0,
-                      display:'flex', alignItems:'center',
-                      justifyContent:'space-between', padding:'0 20px'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
-          <span style={{fontWeight:800, fontSize:'18px'}}>
-            Prime<span style={{color:'#0EA5A0'}}>Talk</span>
+    <div style={{
+      width: '100vw', height: '100vh', background: '#0D1117',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      fontFamily: 'system-ui, sans-serif'
+    }}>
+      {/* Header */}
+      <div style={{
+        height: '56px', background: '#0F172A', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', flexShrink: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <span style={{ color: '#0EA5A0', fontWeight: 700, fontSize: '16px' }}>
+          🎓 Prime Talk
+        </span>
+        {lesson && (
+          <span style={{ color: '#94A3B8', fontSize: '13px' }}>
+            {lesson.duration} min · {lesson.textbook}
           </span>
-          <span style={{color:'#64748B', fontSize:'13px'}}>|</span>
-          <span style={{fontSize:'13px', color:'#E2E8F0'}}>
-            Business English with {teacherName}
-          </span>
-        </div>
-        
-        <div style={{display:'flex', alignItems:'center', gap:'8px',
-                     fontFamily:'monospace', fontSize:'20px', fontWeight:700,
-                     color: isLowTime ? '#EF4444' : '#0EA5A0'}}>
-          ⏱ {formatTime(timeLeft)}
-        </div>
-        
-        <div style={{display:'flex', gap:'8px'}}>
-          <button onClick={() => setIsMuted(m => !m)}
-            style={{padding:'8px 14px', borderRadius:'8px', border:'none',
-                    cursor:'pointer', fontSize:'16px',
-                    background: isMuted ? '#EF4444' : '#1E2535',
-                    color:'white'}}>
-            {isMuted ? '🔇' : '🎤'}
-          </button>
-          <button onClick={() => setCameraOn(c => !c)}
-            style={{padding:'8px 14px', borderRadius:'8px', border:'none',
-                    cursor:'pointer', fontSize:'16px',
-                    background: cameraOn ? '#1E2535' : '#EF4444',
-                    color:'white'}}>
-            {cameraOn ? '📷' : '📵'}
-          </button>
-          <button onClick={() => {
-    const userRole = role || localStorage.getItem('userRole') || 'student'
-    const endPath = userRole === 'teacher' ? '/teacher/dashboard' : '/student/dashboard'
-    navigate(endPath)
-  }}
-            style={{padding:'8px 16px', borderRadius:'8px', border:'none',
-                    background:'#EF4444', color:'white', cursor:'pointer',
-                    fontWeight:600, fontSize:'13px'}}>
-            🔴 End Lesson
-          </button>
-        </div>
-      </header>
-
-      {/* 3 PANELS */}
-      <div style={{display:'flex', flex:1, overflow:'hidden'}}>
-        
-        {/* VIDEO PANEL 50% */}
-        <div style={{width:'50%', background:'#0D1117',
-                     borderRight:'1px solid #1E2535', position:'relative',
-                     display:'flex', alignItems:'center', justifyContent:'center'}}>
-          
-          {/* Daily Video Container */}
-          <div ref={dailyContainerRef}
-            style={{width:'100%', height:'100%', background:'#0D1117',
-                    borderRadius:'12px', overflow:'hidden', minHeight:'400px'}}>
-            {lessonLoading && (
-              <div style={{display:'flex', alignItems:'center', justifyContent:'center',
-                           height:'100%', color:'#64748B', flexDirection:'column', gap:'12px'}}>
-                <div style={{fontSize:'32px'}}>📡</div>
-                <p>Connecting to video room...</p>
-              </div>
-            )}
-            {lessonError && (
-              <div style={{display:'flex', alignItems:'center', justifyContent:'center',
-                           height:'100%', color:'#EF4444', flexDirection:'column', gap:'12px'}}>
-                <div style={{fontSize:'32px'}}>❌</div>
-                <p>{lessonError}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* TEXTBOOK PANEL 30% */}
-        <div style={{width:'30%', background:'#161C27',
-                     borderRight:'1px solid #1E2535',
-                     display:'flex', flexDirection:'column'}}>
-          
-          <div style={{padding:'12px 16px', borderBottom:'1px solid #1E2535',
-                       display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-            <span style={{fontWeight:600, fontSize:'14px'}}>📚 Textbook</span>
-            <select style={{background:'#0D1117', color:'white', border:'1px solid #1E2535',
-                            fontSize:'12px', padding:'4px 8px', borderRadius:'6px',
-                            outline:'none'}}>
-              <option>Business English</option>
-              <option>IELTS Prep</option>
-              <option>Conversation</option>
-            </select>
-          </div>
-          
-          <div style={{padding:'8px 16px', borderBottom:'1px solid #1E2535',
-                       display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-            <button onClick={() => setPage(p => Math.max(1,p-1))}
-              style={{background:'#1E2535', border:'none', color:'white',
-                      padding:'4px 12px', borderRadius:'6px', cursor:'pointer'}}>←</button>
-            <span style={{fontSize:'13px', color:'#64748B'}}>Page {page} / 24</span>
-            <button onClick={() => setPage(p => Math.min(24,p+1))}
-              style={{background:'#1E2535', border:'none', color:'white',
-                      padding:'4px 12px', borderRadius:'6px', cursor:'pointer'}}>→</button>
-          </div>
-          
-          <div style={{flex:1, padding:'20px', overflowY:'auto'}}>
-            <h3 style={{color:'#0EA5A0', fontSize:'15px', marginBottom:'12px', fontWeight:700}}>
-              Chapter {page}: Professional Email Writing
-            </h3>
-            <p style={{color:'#94A3B8', fontSize:'13px', lineHeight:1.8, marginBottom:'16px'}}>
-              Professional emails need a clear structure. Always begin with a formal 
-              greeting and state your purpose in the opening sentence.
-            </p>
-            <div style={{background:'#0D1117', borderRadius:'8px', padding:'14px',
-                         borderLeft:'3px solid #0EA5A0', marginBottom:'16px'}}>
-              <p style={{color:'#0EA5A0', fontSize:'12px', fontWeight:700, marginBottom:'8px'}}>
-                📝 Example
-              </p>
-              <p style={{color:'#94A3B8', fontSize:'13px', lineHeight:1.7}}>
-                "Dear Mr. Smith,<br/>I am writing to follow up on our previous 
-                discussion regarding the Q3 timeline..."
-              </p>
-            </div>
-            <p style={{color:'white', fontSize:'13px', fontWeight:600, marginBottom:'10px'}}>
-              Key Phrases:
-            </p>
-            {['Follow up', 'Regarding', 'As per our discussion', 
-              'Please find attached', 'Looking forward to hearing from you'].map(w => (
-              <div key={w} style={{display:'flex', gap:'8px', alignItems:'flex-start',
-                                    marginBottom:'8px'}}>
-                <span style={{color:'#0EA5A0', flexShrink:0}}>▸</span>
-                <span style={{color:'#E2E8F0', fontSize:'13px'}}>{w}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* CHAT PANEL 20% */}
-        <div style={{width:'20%', background:'#161C27',
-                     display:'flex', flexDirection:'column'}}>
-          
-          <div style={{padding:'10px 12px', borderBottom:'1px solid #1E2535'}}>
-            <div style={{display:'flex', gap:'3px'}}>
-              {['Chat','Notes','Vocab'].map(t => (
-                <button key={t} onClick={() => setActiveTab(t)}
-                  style={{flex:1, padding:'7px 4px', borderRadius:'6px',
-                          border:'none', fontSize:'12px', cursor:'pointer',
-                          fontWeight:600,
-                          background: activeTab===t ? '#0EA5A0' : '#1E2535',
-                          color: activeTab===t ? 'white' : '#64748B'}}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {activeTab==='Chat' && <>
-            <div style={{flex:1, padding:'12px', overflowY:'auto',
-                         display:'flex', flexDirection:'column', gap:'10px'}}>
-              {messages.map((m,i) => (
-                <div key={i} style={{alignSelf: m.sender==='me' ? 'flex-end':'flex-start',
-                                     maxWidth:'88%'}}>
-                  <div style={{padding:'8px 12px', borderRadius:'12px', fontSize:'13px',
-                               background: m.sender==='me' ? '#0EA5A0' : '#1E2535',
-                               color:'white', lineHeight:1.5}}>
-                    {m.text}
-                  </div>
-                  <div style={{fontSize:'10px', color:'#64748B', marginTop:'3px',
-                               textAlign: m.sender==='me' ? 'right':'left'}}>
-                    {m.time}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{padding:'10px', borderTop:'1px solid #1E2535',
-                         display:'flex', gap:'6px'}}>
-              <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                onKeyDown={e=>e.key==='Enter'&&sendMessage()}
-                placeholder="Message..."
-                style={{flex:1, background:'#0D1117', border:'1px solid #1E2535',
-                        borderRadius:'8px', padding:'8px 10px', color:'white',
-                        fontSize:'12px', outline:'none'}} />
-              <button onClick={sendMessage}
-                style={{background:'#0EA5A0', border:'none', borderRadius:'8px',
-                        padding:'8px 12px', color:'white', cursor:'pointer',
-                        fontSize:'14px'}}>→</button>
-            </div>
-          </>}
-
-          {activeTab==='Notes' && (
-            <div style={{flex:1, padding:'12px', display:'flex', flexDirection:'column', gap:'8px'}}>
-              <textarea value={notes} onChange={e=>setNotes(e.target.value)}
-                placeholder="Take notes here..."
-                style={{flex:1, background:'#0D1117', border:'1px solid #1E2535',
-                        borderRadius:'8px', padding:'12px', color:'white',
-                        fontSize:'13px', resize:'none', outline:'none', lineHeight:1.7}} />
-              <button style={{background:'#0EA5A0', border:'none', borderRadius:'8px',
-                              padding:'8px', color:'white', cursor:'pointer',
-                              fontSize:'13px', fontWeight:600}}>
-                💾 Save Notes
-              </button>
-            </div>
-          )}
-
-          {activeTab==='Vocab' && (
-            <div style={{flex:1, padding:'12px', overflowY:'auto',
-                         display:'flex', flexDirection:'column', gap:'8px'}}>
-              {vocabList.map((v,i) => (
-                <div key={i} style={{background:'#0D1117', borderRadius:'8px', padding:'10px'}}>
-                  <div style={{color:'#0EA5A0', fontWeight:700, fontSize:'13px'}}>{v.word}</div>
-                  <div style={{color:'#94A3B8', fontSize:'12px', marginTop:'4px'}}>{v.definition}</div>
-                </div>
-              ))}
-              <div style={{display:'flex', gap:'6px', marginTop:'4px'}}>
-                <input value={newWord} onChange={e=>setNewWord(e.target.value)}
-                  placeholder="Add word..."
-                  style={{flex:1, background:'#0D1117', border:'1px solid #1E2535',
-                          borderRadius:'6px', padding:'6px 8px', color:'white',
-                          fontSize:'12px', outline:'none'}} />
-                <button onClick={addVocab}
-                  style={{background:'#0EA5A0', border:'none', borderRadius:'6px',
-                          padding:'6px 10px', color:'white', cursor:'pointer',
-                          fontWeight:700}}>+</button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
+        <button onClick={handleEndLesson} style={{
+          background: '#EF4444', color: 'white', border: 'none',
+          borderRadius: '8px', padding: '8px 14px', cursor: 'pointer',
+          fontWeight: 600, fontSize: '13px'
+        }}>End Lesson</button>
       </div>
 
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
+      {/* Video area */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {(status || error) && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: '16px', zIndex: 10,
+            background: '#0D1117'
+          }}>
+            {error ? (
+              <>
+                <div style={{ fontSize: '48px' }}>❌</div>
+                <p style={{ color: '#EF4444', fontSize: '16px',
+                  textAlign: 'center', maxWidth: '320px', padding: '0 16px', margin: 0 }}>
+                  {error}
+                </p>
+                <button onClick={() => navigate(-1)} style={{
+                  background: '#0EA5A0', color: 'white', border: 'none',
+                  borderRadius: '8px', padding: '10px 24px', cursor: 'pointer',
+                  fontWeight: 600
+                }}>← Go Back</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '48px' }}>
+                  {status.includes('Waiting') ? '⏳' : '📡'}
+                </div>
+                <p style={{ color: '#94A3B8', fontSize: '16px', margin: 0, textAlign: 'center' }}>
+                  {status}
+                </p>
+                {status.includes('Waiting') && (
+                  <p style={{ color: '#64748B', fontSize: '13px', margin: 0 }}>
+                    Teacher will accept shortly...
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        <div ref={containerRef} style={{
+          width: '100%', height: '100%', background: '#0D1117'
+        }} />
+      </div>
     </div>
   )
 }

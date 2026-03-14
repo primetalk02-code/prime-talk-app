@@ -1,117 +1,92 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
-export default function IncomingLessonAlert({ studentName, subject, duration, preference, onAccept }) {
-  const [countdown, setCountdown] = useState(30)
-  const audioRef = useRef(null)
+export default function IncomingLessonAlert({ lesson, onAccept }) {
+  const [studentName, setStudentName] = useState('Student')
+  const [seconds, setSeconds] = useState(30)
 
+  useEffect(() => {
+    if (!lesson?.student_id) return
+    supabase.from('profiles')
+      .select('full_name')
+      .eq('id', lesson.student_id)
+      .single()
+      .then(({ data }) => {
+        if (data?.full_name) setStudentName(data.full_name)
+      })
+  }, [lesson])
+
+  useEffect(() => {
+    if (seconds <= 0) return
+    const t = setInterval(() => setSeconds(s => s - 1), 1000)
+    return () => clearInterval(t)
+  }, [seconds])
+
+  // Play alarm sound
   useEffect(() => {
     try {
       const audio = new Audio('/sounds/incoming.wav')
       audio.loop = true
-      audio.play().catch(()=>{})
-      audioRef.current = audio
-    } catch(e) {}
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-        audioRef.current = null
-      }
-    }
-  }, [])
-
-  const handleAccept = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current = null
-    }
-    onAccept()
-  }
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setCountdown(c => {
-        if (c <= 1) { clearInterval(t); return 0; }
-        return c - 1;
-      })
-    }, 1000)
-    return () => clearInterval(t)
+      audio.play().catch(() => {})
+      return () => { audio.pause(); audio.currentTime = 0 }
+    } catch (e) {}
   }, [])
 
   return (
-    <>
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateY(80px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes ping {
-          0% { transform: scale(1); opacity: 0.6; }
-          100% { transform: scale(2); opacity: 0; }
-        }
-      `}</style>
-      <div style={{position:'fixed', bottom:'24px', right:'24px', zIndex:9999,
-                   background:'#161C27', border:'2px solid #0EA5A0',
-                   borderRadius:'20px', padding:'24px', width:'300px',
-                   boxShadow:'0 20px 60px rgba(0,0,0,0.6)',
-                   animation:'slideIn 0.4s ease'}}>
-        
-        <div style={{position:'relative', width:'56px', height:'56px',
-                     margin:'0 auto 16px'}}>
-          <div style={{position:'absolute', inset:'-10px', borderRadius:'50%',
-                       border:'2px solid #0EA5A0', opacity:0.5,
-                       animation:'ping 1.2s ease-out infinite'}} />
-          <div style={{width:'56px', height:'56px', borderRadius:'50%',
-                       background:'linear-gradient(135deg,#0EA5A0,#0C8F8A)',
-                       display:'flex', alignItems:'center', justifyContent:'center',
-                       fontSize:'26px'}}>👤</div>
-        </div>
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 9999, padding: '20px'
+    }}>
+      <div style={{
+        background: '#FFFFFF', borderRadius: '20px', padding: '32px',
+        maxWidth: '380px', width: '100%', textAlign: 'center',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        animation: 'pulse 1s infinite'
+      }}>
+        <div style={{ fontSize: '56px', marginBottom: '16px' }}>📲</div>
 
-        <p style={{textAlign:'center', color:'#64748B', fontSize:'11px',
-                   marginBottom:'4px', textTransform:'uppercase', letterSpacing:'1px'}}>
-          Incoming Request
-        </p>
-        <h3 style={{textAlign:'center', color:'white', fontSize:'20px',
-                    fontWeight:800, margin:'0 0 4px'}}>
-          {studentName}
-        </h3>
-        <p style={{textAlign:'center', color:'#0EA5A0', fontSize:'13px',
-                   marginBottom:'16px'}}>
-          {subject} • {duration} min
+        <h2 style={{ fontSize: '20px', fontWeight: 700,
+          color: '#0F172A', margin: '0 0 8px 0' }}>
+          Incoming Student!
+        </h2>
+
+        <p style={{ color: '#64748B', margin: '0 0 6px 0', fontSize: '15px' }}>
+          <strong style={{ color: '#0F172A' }}>{studentName}</strong> wants a lesson
         </p>
 
-        <div style={{background:'rgba(14,165,160,0.1)', borderRadius:'10px',
-                     padding:'12px', marginBottom:'16px', fontSize:'13px', color:'#94A3B8'}}>
-          <p style={{margin:'0 0 4px', fontWeight:600, color:'#0EA5A0'}}>Student Preference:</p>
-          <p style={{margin:0}}>{preference || 'General English Conversation'}</p>
+        {lesson?.duration && (
+          <p style={{ color: '#0EA5A0', fontWeight: 600,
+            fontSize: '14px', margin: '0 0 4px 0' }}>
+            ⏱ {lesson.duration} min · {lesson.textbook || 'Daily Conversation'}
+          </p>
+        )}
+
+        <div style={{
+          background: seconds <= 10 ? '#FEF2F2' : '#F0FDFC',
+          borderRadius: '10px', padding: '10px', margin: '16px 0',
+        }}>
+          <p style={{
+            color: seconds <= 10 ? '#EF4444' : '#0EA5A0',
+            fontWeight: 700, fontSize: '18px', margin: 0
+          }}>
+            {seconds}s remaining
+          </p>
         </div>
 
-        <div style={{textAlign:'center', marginBottom:'12px'}}>
-          <span style={{fontSize:'32px', fontWeight:800, color:'#F59E0B',
-                        display:'block', lineHeight:1}}>
-            {countdown}s
-          </span>
-          <span style={{color:'#64748B', fontSize:'11px'}}>Auto-decline</span>
-        </div>
+        <button onClick={onAccept} style={{
+          width: '100%', background: '#0EA5A0', color: 'white',
+          border: 'none', borderRadius: '12px', padding: '14px',
+          fontSize: '16px', fontWeight: 700, cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(14,165,160,0.4)'
+        }}>
+          ✅ Accept & Join
+        </button>
 
-        <div style={{height:'3px', background:'#1E2535', borderRadius:'2px',
-                     marginBottom:'16px'}}>
-          <div style={{height:'100%', borderRadius:'2px', background:'#F59E0B',
-                       width:`${(countdown/30)*100}%`,
-                       transition:'width 1s linear'}} />
-        </div>
-
-        <div style={{display:'flex'}}>
-          <button onClick={handleAccept}
-            style={{width:'100%', padding:'14px', borderRadius:'10px', border:'none',
-                    background:'linear-gradient(135deg,#0EA5A0,#0C8F8A)',
-                    color:'white', cursor:'pointer', fontWeight:700,
-                    fontSize:'16px', boxShadow:'0 4px 15px rgba(14,165,160,0.4)'}}>
-            ✓ Accept Lesson
-          </button>
-        </div>
+        <p style={{ color: '#94A3B8', fontSize: '12px', marginTop: '12px', marginBottom: 0 }}>
+          Auto-declines if not accepted in time
+        </p>
       </div>
-    </>
+    </div>
   )
 }
