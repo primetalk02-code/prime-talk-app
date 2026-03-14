@@ -2,12 +2,18 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const LandingPage = () => {
-  const isMobile = window.innerWidth < 768
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [visibleSections, setVisibleSections] = useState(new Set())
   const [statsVisible, setStatsVisible] = useState(false)
 
   // Intersection Observer for scroll animations
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -256,7 +262,7 @@ const LandingPage = () => {
       <section style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center',
         background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
-        padding: '120px 80px 80px', position: 'relative', overflow: 'hidden'
+        padding: isMobile ? '80px 20px 40px' : '120px 80px 80px', position: 'relative', overflow: 'hidden'
       }}>
         {/* Background decorative circles */}
         <div style={{
@@ -270,7 +276,7 @@ const LandingPage = () => {
           borderRadius: '50%', filter: 'blur(40px)', zIndex: 0
         }}></div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 48, zIndex: 1, flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '60% 40%', gap: isMobile ? 24 : 48, zIndex: 1, flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             {/* Badge */}
             <div style={{
@@ -284,13 +290,13 @@ const LandingPage = () => {
             {/* Headline */}
             <div>
             <h1 style={{
-                fontSize: isMobile ? 32 : 64, fontWeight: 800, color: 'white', lineHeight: 1.1,
+                fontSize: isMobile ? 34 : 64, fontWeight: 800, color: 'white', lineHeight: 1.1,
                 marginBottom: 12
               }}>
                 Learn English with Expert Tutors
               </h1>
               <h1 style={{
-                fontSize: isMobile ? 32 : 64, fontWeight: 800, color: '#0EA5A0', lineHeight: 1.1
+                fontSize: isMobile ? 34 : 64, fontWeight: 800, color: '#0EA5A0', lineHeight: 1.1
               }}>
                 Anytime, Instantly.
               </h1>
@@ -351,7 +357,7 @@ const LandingPage = () => {
           <div style={{
             background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 32,
-            display: 'flex', flexDirection: 'column', gap: 24, position: 'relative'
+            display: isMobile ? 'none' : 'flex', flexDirection: 'column', gap: 24, position: 'relative'
           }}>
             {/* Live Now badge */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

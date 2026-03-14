@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
@@ -11,6 +11,13 @@ function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -69,13 +76,13 @@ function Register() {
   }
 
   const leftStyle = {
-    width: '55%', background: 'linear-gradient(135deg, #0F172A 0%, #0EA5A0 100%)',
+    width: isMobile ? '100%' : '55%', background: 'linear-gradient(135deg, #0F172A 0%, #0EA5A0 100%)',
     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-    padding: '48px'
+    padding: isMobile ? '24px' : '48px'
   }
 
   const rightStyle = {
-    flex: 1, background: 'white', display: 'flex', 
+    flex: 1, background: 'white', display: isMobile ? 'none' : 'flex', 
     alignItems: 'center', justifyContent: 'center', padding: '48px'
   }
 
@@ -142,8 +149,8 @@ function Register() {
           
           {/* Role tabs */}
           <div style={{
-            display: 'flex', background: '#F1F5F9', borderRadius: 10,
-            padding: 4, marginBottom: 24
+            display: isMobile ? 'grid' : 'flex', background: '#F1F5F9', borderRadius: 10,
+            padding: 4, marginBottom: 24, gridTemplateColumns: isMobile ? '1fr 1fr' : 'auto'
           }}>
             <button 
               onClick={() => setRole('student')}
@@ -173,7 +180,7 @@ function Register() {
             </button>
           </div>
 
-          <h1 style={{ fontSize: 30, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+          <h1 style={{ fontSize: isMobile ? 28 : 30, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
             Create your account
           </h1>
           <p style={{ color: '#64748B', marginBottom: 24 }}>
@@ -201,7 +208,7 @@ function Register() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
             {/* Full Name field */}
             <div>
               <label style={{
@@ -292,7 +299,7 @@ function Register() {
               disabled={loading || success}
               style={{
                 width: '100%', background: loading || success ? '#64748B' : '#0EA5A0',
-                color: 'white', padding: '13px', borderRadius: 8, fontSize: 15,
+                color: 'white', padding: isMobile ? '12px' : '13px', borderRadius: 8, fontSize: 15,
                 fontWeight: 600, border: 'none', cursor: loading || success ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s'
               }}
