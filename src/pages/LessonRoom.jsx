@@ -1,4 +1,5 @@
-﻿import { useEffect, useRef, useState } from 'react'
+﻿import React from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
@@ -165,3 +166,4 @@ export default function LessonRoom() {
     )
   )
 }
+
