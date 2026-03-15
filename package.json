@@ -13,10 +13,13 @@
   "dependencies": {
     "@daily-co/daily-js": "^0.87.0",
     "@daily-co/daily-react": "^0.24.0",
+    "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.98.0",
+    "framer-motion": "^12.36.0",
     "prop-types": "^15.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-pdf": "^10.4.1",
     "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
