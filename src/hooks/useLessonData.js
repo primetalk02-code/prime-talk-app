@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase'; // Adjust path to your supabase client
+import { supabase } from '../lib/supabaseClient'; // Fixed: using supabaseClient.js
 
 export default function useLessonData(id) {
   const [data, setData] = useState({
@@ -114,7 +114,10 @@ export default function useLessonData(id) {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           // Track this user as present
-          await channel.track({ user_id: (await supabase.auth.getUser()).data.user?.id });
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await channel.track({ user_id: user.id });
+          }
         }
       });
 
