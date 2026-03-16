@@ -70,8 +70,6 @@ export default function StudentOnlineTeachers() {
     setSubmitting(true)
     setError('')
     try {
-      const DAILY_API_KEY = import.meta.env.VITE_DAILY_API_KEY
-      const DAILY_DOMAIN = import.meta.env.VITE_DAILY_DOMAIN || 'prime-talk.daily.co'
       const teacher = teachers[0]
       const { data: lesson, error: lessonError } = await supabase
         .from('lessons')
@@ -82,31 +80,13 @@ export default function StudentOnlineTeachers() {
         })
         .select('id').single()
       if (lessonError) throw lessonError
-      const roomName = `lesson-${lesson.id}`
-      const roomUrl = `https://${DAILY_DOMAIN}/${roomName}`
-      try {
-        await fetch('https://api.daily.co/v1/rooms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DAILY_API_KEY}` },
-          body: JSON.stringify({ name: roomName, privacy: 'private',
-            properties: { exp: Math.floor(Date.now() / 1000) + 7200 } }),
-        })
-      } catch (e) { console.warn('Room:', e) }
-      let studentToken = null
-      try {
-        const res = await fetch('https://api.daily.co/v1/meeting-tokens', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DAILY_API_KEY}` },
-          body: JSON.stringify({ properties: {
-            room_name: roomName, user_id: currentUser.id,
-            is_owner: false, exp: Math.floor(Date.now() / 1000) + 7200,
-          }}),
-        })
-        const d = await res.json()
-        studentToken = d.token
-      } catch (e) { console.warn('Token:', e) }
+      
+      // Create JaaS room
+      const roomName = `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const roomUrl = `https://meet.jitsi.si/${roomName}`
+      
       await supabase.from('lessons')
-        .update({ room_name: roomName, room_url: roomUrl, student_token: studentToken })
+        .update({ room_name: roomName, room_url: roomUrl })
         .eq('id', lesson.id)
       setLessonId(lesson.id)
       setStep('waiting')

@@ -1,6 +1,5 @@
 import {
   assertPostMethod,
-  createDailyRoomForLesson,
   getServerSupabaseClient,
   parseOptionalIsoDate,
   requireStringField,
@@ -56,13 +55,13 @@ export default async function handler(req, res) {
       return sendError(res, 500, 'Failed to create lesson', lessonError?.message)
     }
 
-    const room = await createDailyRoomForLesson({ lessonId: lesson.id })
-
+    // TODO: Create JaaS room and update lesson with room details
+    const roomName = `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
     const { error: lessonUpdateError } = await supabase
       .from('lessons')
       .update({
-        room_url: room.roomUrl,
-        room_name: room.roomName,
+        room_name: roomName,
       })
       .eq('id', lesson.id)
 
@@ -97,7 +96,7 @@ export default async function handler(req, res) {
       reservationId: reservation.id,
       lessonId: lesson.id,
       roomId: reservation.room_id,
-      roomUrl: room.roomUrl,
+      roomName: roomName,
     })
   } catch (error) {
     return sendError(res, 400, error.message || 'Failed to create reservation')

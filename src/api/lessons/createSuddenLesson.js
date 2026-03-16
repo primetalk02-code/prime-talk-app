@@ -1,5 +1,4 @@
 import { supabase } from '../../lib/supabaseClient'
-import { createDailyRoom, createDailyToken, extractRoomNameFromUrl } from '../daily'
 
 export async function createSuddenLesson(studentId, textbook = 'English Lesson') {
   try {
@@ -34,22 +33,16 @@ export async function createSuddenLesson(studentId, textbook = 'English Lesson')
 
     if (lessonError) throw lessonError
 
-    // 3. Create Daily room
-    const roomUrl = await createDailyRoom(26)
-    const roomName = await extractRoomNameFromUrl(roomUrl)
+    // 3. Create JaaS room
+    const roomName = `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const roomUrl = `https://meet.jitsi.si/${roomName}`
 
-    // 4. Generate tokens
-    const teacherToken = await createDailyToken(roomName, teacherId, true)
-    const studentToken = await createDailyToken(roomName, studentId, false)
-
-    // 5. Update lesson with room info and tokens
+    // 4. Update lesson with room info
     const { data: updatedLesson, error: updateError } = await supabase
       .from('lessons')
       .update({
         room_url: roomUrl,
-        room_name: roomName,
-        teacher_token: teacherToken,
-        student_token: studentToken
+        room_name: roomName
       })
       .eq('id', lesson.id)
       .select()
@@ -59,9 +52,7 @@ export async function createSuddenLesson(studentId, textbook = 'English Lesson')
 
     return {
       success: true,
-      lesson: updatedLesson,
-      teacherToken,
-      studentToken
+      lesson: updatedLesson
     }
 
   } catch (error) {

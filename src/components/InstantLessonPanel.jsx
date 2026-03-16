@@ -8,9 +8,9 @@ export default function InstantLessonPanel({ teacherId, studentId, onStartLesson
     setLoading(true)
     setError('')
     try {
-      // Call backend API to create Daily.co room
+      // Call backend API to create JaaS room
       const payload = teacherId ? { teacherId } : { studentId }
-      const res = await fetch('/api/create-daily-room', {
+      const res = await fetch('/api/create-instant-lesson', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -19,11 +19,11 @@ export default function InstantLessonPanel({ teacherId, studentId, onStartLesson
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to create room')
       }
-      const roomUrl = data?.roomUrl || data?.url
-      if (!roomUrl) {
+      const roomName = data?.roomName
+      if (!roomName) {
         throw new Error('Failed to create room')
       }
-      onStartLesson(roomUrl)
+      onStartLesson(roomName)
     } catch (e) {
       setError(e.message || 'Failed to start lesson')
     } finally {

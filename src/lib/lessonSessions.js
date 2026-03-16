@@ -69,27 +69,12 @@ export async function createPendingLessonRequest({
 }
 
 export async function createRoomForLesson({ lessonId, teacherId, studentId }) {
-  const { data, error } = await supabase.functions.invoke('create-room', {
-    body: {
-      lesson_id: lessonId,
-      teacher_id: teacherId,
-      student_id: studentId,
-    },
-  })
-
-  if (error) {
-    throw error
-  }
-
-  const { room_url, room_name } = parseRoomFields(data)
-
-  if (!room_url) {
-    throw new Error('Daily room was created without a room URL.')
-  }
-
+  // TODO: Create JaaS room
+  const roomName = `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  
   return {
-    room_url,
-    room_name: room_name || null,
+    room_url: `https://meet.jitsi.si/${roomName}`,
+    room_name: roomName,
   }
 }
 
@@ -213,7 +198,7 @@ export async function saveLessonHistoryRecord({
   }
 }
 
-export async function createLessonWithDailyRoom({
+export async function createLessonWithJaaSRoom({
   teacherId,
   studentId,
   duration = 10,
@@ -231,9 +216,9 @@ export async function createLessonWithDailyRoom({
   return await activateLessonWithRoom({ lessonId: pendingLesson.id })
 }
 
-export async function attachDailyRoomToLesson({ lessonId, teacherId, studentId }) {
+export async function attachJaaSRoomToLesson({ lessonId, teacherId, studentId }) {
   if (!lessonId || !teacherId || !studentId) {
-    throw new Error('Missing required fields to attach Daily room to lesson.')
+    throw new Error('Missing required fields to attach JaaS room to lesson.')
   }
 
   const roomFields = await createRoomForLesson({
