@@ -1,0 +1,92 @@
+{
+  "id": "ke1-lesson02",
+  "title": "Numbers and Counting",
+  "level": "beginner",
+  "duration": 30,
+  "textbook": "Key English 1",
+  "unit": 1,
+  "lessonNumber": 2,
+  "objectives": [
+    "Learn numbers 1-20",
+    "Practice counting objects",
+    "Understand number usage in daily life"
+  ],
+  "vocabulary": [
+    {
+      "word": "One",
+      "translation": "一",
+      "pronunciation": "/wʌn/",
+      "example": "I have one book.",
+      "audio": "/media/ke1/lesson02/one.mp3"
+    },
+    {
+      "word": "Two",
+      "translation": "二",
+      "pronunciation": "/tuː/",
+      "example": "I have two pens.",
+      "audio": "/media/ke1/lesson02/two.mp3"
+    },
+    {
+      "word": "Three",
+      "translation": "三",
+      "pronunciation": "/θriː/",
+      "example": "I have three apples.",
+      "audio": "/media/ke1/lesson02/three.mp3"
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "dialogue1",
+      "title": "Counting Objects",
+      "lines": [
+        {
+          "speaker": "Teacher",
+          "text": "How many apples do you see?",
+          "audio": "/media/ke1/lesson02/dialogue1_line1.mp3"
+        },
+        {
+          "speaker": "Student",
+          "text": "I see five apples.",
+          "audio": "/media/ke1/lesson02/dialogue1_line2.mp3"
+        },
+        {
+          "speaker": "Teacher",
+          "text": "Very good! And how many books?",
+          "audio": "/media/ke1/lesson02/dialogue1_line3.mp3"
+        }
+      ]
+    }
+  ],
+  "exercises": [
+    {
+      "type": "fill_in_the_blank",
+      "title": "Complete the Numbers",
+      "instructions": "Fill in the missing numbers",
+      "questions": [
+        {
+          "sentence": "One, two, ___, four, five",
+          "answer": "three"
+        },
+        {
+          "sentence": "Ten, ___, twelve, thirteen",
+          "answer": "eleven"
+        }
+      ]
+    }
+  ],
+  "media": {
+    "audio": {
+      "lesson_intro": "/media/ke1/lesson02/lesson_intro.mp3",
+      "numbers": "/media/ke1/lesson02/numbers.mp3",
+      "counting": "/media/ke1/lesson02/counting.mp3"
+    },
+    "video": {
+      "lesson_video": "/media/ke1/lesson02/lesson_video.mp4"
+    }
+  },
+  "metadata": {
+    "created_at": "2026-03-16T11:00:00Z",
+    "updated_at": "2026-03-16T11:00:00Z",
+    "version": "1.0.0"
+  }
+}

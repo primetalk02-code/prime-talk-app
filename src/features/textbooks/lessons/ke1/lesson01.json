@@ -1,0 +1,94 @@
+{
+  "id": "ke1-lesson01",
+  "title": "Greetings and Introductions",
+  "level": "beginner",
+  "duration": 30,
+  "textbook": "Key English 1",
+  "unit": 1,
+  "lessonNumber": 1,
+  "objectives": [
+    "Learn basic greetings",
+    "Practice self-introductions",
+    "Understand polite expressions"
+  ],
+  "vocabulary": [
+    {
+      "word": "Hello",
+      "translation": "你好",
+      "pronunciation": "/həˈloʊ/",
+      "example": "Hello, how are you?",
+      "audio": "/media/ke1/lesson01/hello.mp3"
+    },
+    {
+      "word": "Good morning",
+      "translation": "早上好",
+      "pronunciation": "/ɡʊd ˈmɔːrnɪŋ/",
+      "example": "Good morning, teacher!",
+      "audio": "/media/ke1/lesson01/good_morning.mp3"
+    },
+    {
+      "word": "My name is",
+      "translation": "我的名字是",
+      "pronunciation": "/maɪ neɪm ɪz/",
+      "example": "My name is John.",
+      "audio": "/media/ke1/lesson01/my_name_is.mp3"
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "dialogue1",
+      "title": "Meeting Someone New",
+      "lines": [
+        {
+          "speaker": "A",
+          "text": "Hello! What's your name?",
+          "audio": "/media/ke1/lesson01/dialogue1_line1.mp3"
+        },
+        {
+          "speaker": "B", 
+          "text": "Hi! My name is Sarah. What's your name?",
+          "audio": "/media/ke1/lesson01/dialogue1_line2.mp3"
+        },
+        {
+          "speaker": "A",
+          "text": "I'm John. Nice to meet you!",
+          "audio": "/media/ke1/lesson01/dialogue1_line3.mp3"
+        }
+      ]
+    }
+  ],
+  "exercises": [
+    {
+      "type": "matching",
+      "title": "Match the Greeting",
+      "instructions": "Match the English greeting with its Chinese translation",
+      "questions": [
+        {
+          "english": "Hello",
+          "chinese": "你好",
+          "options": ["你好", "再见", "谢谢"]
+        },
+        {
+          "english": "Good morning",
+          "chinese": "早上好", 
+          "options": ["早上好", "晚上好", "下午好"]
+        }
+      ]
+    }
+  ],
+  "media": {
+    "audio": {
+      "lesson_intro": "/media/ke1/lesson01/lesson_intro.mp3",
+      "vocabulary": "/media/ke1/lesson01/vocabulary.mp3",
+      "dialogues": "/media/ke1/lesson01/dialogues.mp3"
+    },
+    "video": {
+      "lesson_video": "/media/ke1/lesson01/lesson_video.mp4"
+    }
+  },
+  "metadata": {
+    "created_at": "2026-03-16T11:00:00Z",
+    "updated_at": "2026-03-16T11:00:00Z",
+    "version": "1.0.0"
+  }
+}
